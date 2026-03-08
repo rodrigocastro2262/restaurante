@@ -2,13 +2,45 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Pedido, Producto } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
-import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play } from 'lucide-react';
+import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package } from 'lucide-react';
+
+type AdminTab = 'caja' | 'gastos' | 'ventas';
+
+interface Gasto {
+  id: number;
+  descripcion: string;
+  categoria: string;
+  monto: number;
+  fecha: string;
+}
+
+interface ReporteVentas {
+  ventas: number;
+  gastos: number;
+  ganancia: number;
+}
+
+interface ReporteProducto {
+  nombre: string;
+  cantidad: number;
+  total: number;
+}
 
 export default function AdminView() {
+  const [activeTab, setActiveTab] = useState<AdminTab>('caja');
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo');
+  
+  // Gastos state
+  const [gastos, setGastos] = useState<Gasto[]>([]);
+  const [newGasto, setNewGasto] = useState({ descripcion: '', categoria: 'insumos', monto: '' });
+  
+  // Reportes state
+  const [reporteFecha, setReporteFecha] = useState(new Date().toISOString().split('T')[0]);
+  const [reporteVentas, setReporteVentas] = useState<ReporteVentas>({ ventas: 0, gastos: 0, ganancia: 0 });
+  const [reporteProductos, setReporteProductos] = useState<ReporteProducto[]>([]);
 
   const fetchData = useCallback(async () => {
     try {
@@ -24,11 +56,61 @@ export default function AdminView() {
     }
   }, []);
 
+  const fetchGastos = useCallback(async () => {
+    try {
+      const res = await fetch(`/api/gastos?fecha=${reporteFecha}`);
+      if (res.ok) setGastos(await res.json());
+    } catch (error) {
+      console.error('Error fetching gastos:', error);
+    }
+  }, [reporteFecha]);
+
+  const fetchReportes = useCallback(async () => {
+    try {
+      const [ventasRes, prodRes] = await Promise.all([
+        fetch(`/api/reportes/ventas?fecha=${reporteFecha}`),
+        fetch(`/api/reportes/productos?fecha=${reporteFecha}`)
+      ]);
+      
+      if (ventasRes.ok) setReporteVentas(await ventasRes.json());
+      if (prodRes.ok) setReporteProductos(await prodRes.json());
+    } catch (error) {
+      console.error('Error fetching reportes:', error);
+    }
+  }, [reporteFecha]);
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  useSSE('/api/events', fetchData);
+  useEffect(() => {
+    if (activeTab === 'gastos') fetchGastos();
+    if (activeTab === 'ventas') fetchReportes();
+  }, [activeTab, reporteFecha, fetchGastos, fetchReportes]);
+
+  useSSE('/api/events', () => {
+    fetchData();
+    if (activeTab === 'ventas') fetchReportes();
+  });
+
+  const handleAddGasto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newGasto.descripcion || !newGasto.monto) return;
+
+    await fetch('/api/gastos', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...newGasto,
+        monto: parseFloat(newGasto.monto),
+        fecha: reporteFecha
+      })
+    });
+    
+    setNewGasto({ descripcion: '', categoria: 'insumos', monto: '' });
+    fetchGastos();
+    if (activeTab === 'ventas') fetchReportes();
+  };
 
   const getProductPrice = (id: number) => {
     return productos.find(p => p.id === id)?.precio || 0;
@@ -178,45 +260,287 @@ export default function AdminView() {
   }
 
   return (
-    <div className="p-6 h-full overflow-y-auto bg-gray-50">
-      <div className="flex items-center gap-3 mb-8">
-        <Receipt className="w-8 h-8 text-gray-900" />
-        <h1 className="text-3xl font-bold text-gray-900">Mesas Ocupadas (Caja)</h1>
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* Admin Navigation */}
+      <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
+          <button
+            onClick={() => setActiveTab('caja')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+              activeTab === 'caja' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Receipt className="w-4 h-4" />
+            Caja
+          </button>
+          <button
+            onClick={() => setActiveTab('gastos')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+              activeTab === 'gastos' ? 'bg-white text-red-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <TrendingDown className="w-4 h-4" />
+            Gastos
+          </button>
+          <button
+            onClick={() => setActiveTab('ventas')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+              activeTab === 'ventas' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <TrendingUp className="w-4 h-4" />
+            Ventas y Reportes
+          </button>
+        </div>
+        
+        {(activeTab === 'gastos' || activeTab === 'ventas') && (
+          <div className="flex items-center gap-2">
+            <Calendar className="w-5 h-5 text-gray-500" />
+            <input
+              type="date"
+              value={reporteFecha}
+              onChange={(e) => setReporteFecha(e.target.value)}
+              className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            />
+          </div>
+        )}
       </div>
 
-      {pedidos.length === 0 ? (
-        <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-          <Receipt className="w-16 h-16 mb-4 opacity-50" />
-          <p className="text-xl font-medium">No hay mesas ocupadas en este momento.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-          {pedidos.map(pedido => (
-            <button
-              key={pedido.id}
-              onClick={() => setSelectedPedido(pedido)}
-              className="relative p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all transform hover:scale-105 shadow-sm bg-red-50 border-2 border-red-200 text-red-700 hover:bg-red-100"
-            >
-              <span className="text-4xl font-black">{pedido.mesa_numero}</span>
-              <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-red-200 text-red-800">
-                Ocupada
-              </span>
-              <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
-                <Utensils className="w-3 h-3 text-white" />
+      <div className="flex-1 overflow-y-auto p-6">
+        {activeTab === 'caja' && (
+          <>
+            <div className="flex items-center gap-3 mb-8">
+              <Receipt className="w-8 h-8 text-gray-900" />
+              <h1 className="text-3xl font-bold text-gray-900">Mesas Ocupadas</h1>
+            </div>
+
+            {pedidos.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+                <Receipt className="w-16 h-16 mb-4 opacity-50" />
+                <p className="text-xl font-medium">No hay mesas ocupadas en este momento.</p>
               </div>
-              {pedido.juego_minutos ? (
-                <TimerDisplay 
-                  inicio={pedido.juego_inicio!} 
-                  minutos={pedido.juego_minutos} 
-                  estado={pedido.juego_estado as any}
-                  restanteMs={pedido.juego_restante_ms!}
-                  className="mt-1 text-xs bg-white/80 px-2 py-1 rounded-full shadow-sm"
-                />
-              ) : null}
-            </button>
-          ))}
-        </div>
-      )}
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {pedidos.map(pedido => (
+                  <button
+                    key={pedido.id}
+                    onClick={() => setSelectedPedido(pedido)}
+                    className="relative p-6 rounded-2xl flex flex-col items-center justify-center gap-3 transition-all transform hover:scale-105 shadow-sm bg-red-50 border-2 border-red-200 text-red-700 hover:bg-red-100"
+                  >
+                    <span className="text-4xl font-black">{pedido.mesa_numero}</span>
+                    <span className="text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full bg-red-200 text-red-800">
+                      Ocupada
+                    </span>
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 rounded-full border-2 border-white flex items-center justify-center">
+                      <Utensils className="w-3 h-3 text-white" />
+                    </div>
+                    {pedido.juego_minutos ? (
+                      <TimerDisplay 
+                        inicio={pedido.juego_inicio!} 
+                        minutos={pedido.juego_minutos} 
+                        estado={pedido.juego_estado as any}
+                        restanteMs={pedido.juego_restante_ms!}
+                        className="mt-1 text-xs bg-white/80 px-2 py-1 rounded-full shadow-sm"
+                      />
+                    ) : null}
+                  </button>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {activeTab === 'gastos' && (
+          <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="md:col-span-1">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+                <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                  <TrendingDown className="w-5 h-5 text-red-500" />
+                  Registrar Gasto
+                </h2>
+                <form onSubmit={handleAddGasto} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Ej: Leche, Conos, Pago luz"
+                      value={newGasto.descripcion}
+                      onChange={e => setNewGasto({...newGasto, descripcion: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Categoría</label>
+                    <select
+                      value={newGasto.categoria}
+                      onChange={e => setNewGasto({...newGasto, categoria: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="insumos">Insumos (Comida/Bebida)</option>
+                      <option value="servicios">Servicios (Luz, Agua, etc)</option>
+                      <option value="nomina">Nómina / Empleados</option>
+                      <option value="otros">Otros</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Monto ($)</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="100"
+                      placeholder="0"
+                      value={newGasto.monto}
+                      onChange={e => setNewGasto({...newGasto, monto: e.target.value})}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    className="w-full py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold transition-colors"
+                  >
+                    Guardar Gasto
+                  </button>
+                </form>
+              </div>
+            </div>
+            
+            <div className="md:col-span-2">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 h-full">
+                <h2 className="text-xl font-bold text-gray-900 mb-6">Historial de Gastos ({reporteFecha})</h2>
+                {gastos.length === 0 ? (
+                  <div className="text-center text-gray-500 py-10">
+                    No hay gastos registrados para esta fecha.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="border-b border-gray-200 text-sm uppercase tracking-wider text-gray-500">
+                          <th className="pb-3 font-medium">Descripción</th>
+                          <th className="pb-3 font-medium">Categoría</th>
+                          <th className="pb-3 font-medium text-right">Monto</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {gastos.map(gasto => (
+                          <tr key={gasto.id} className="text-sm">
+                            <td className="py-3 font-medium text-gray-900">{gasto.descripcion}</td>
+                            <td className="py-3">
+                              <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase ${
+                                gasto.categoria === 'insumos' ? 'bg-blue-100 text-blue-800' :
+                                gasto.categoria === 'servicios' ? 'bg-purple-100 text-purple-800' :
+                                gasto.categoria === 'nomina' ? 'bg-orange-100 text-orange-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {gasto.categoria}
+                              </span>
+                            </td>
+                            <td className="py-3 text-right font-bold text-red-600">
+                              -${gasto.monto.toLocaleString()}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot>
+                        <tr className="border-t-2 border-gray-200">
+                          <td colSpan={2} className="py-4 text-right font-bold text-gray-700">Total Gastos:</td>
+                          <td className="py-4 text-right font-black text-red-600 text-lg">
+                            -${gastos.reduce((sum, g) => sum + g.monto, 0).toLocaleString()}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'ventas' && (
+          <div className="max-w-5xl mx-auto space-y-6">
+            {/* Resumen Financiero */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center mb-3">
+                  <TrendingUp className="w-6 h-6" />
+                </div>
+                <h3 className="text-gray-500 font-medium mb-1">Total Ventas</h3>
+                <p className="text-3xl font-black text-gray-900">${reporteVentas.ventas.toLocaleString()}</p>
+              </div>
+              
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col items-center justify-center text-center">
+                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-full flex items-center justify-center mb-3">
+                  <TrendingDown className="w-6 h-6" />
+                </div>
+                <h3 className="text-gray-500 font-medium mb-1">Total Gastos</h3>
+                <p className="text-3xl font-black text-red-600">-${reporteVentas.gastos.toLocaleString()}</p>
+              </div>
+              
+              <div className={`p-6 rounded-2xl shadow-sm border flex flex-col items-center justify-center text-center ${
+                reporteVentas.ganancia >= 0 
+                  ? 'bg-emerald-50 border-emerald-200' 
+                  : 'bg-red-50 border-red-200'
+              }`}>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-3 ${
+                  reporteVentas.ganancia >= 0 ? 'bg-emerald-200 text-emerald-700' : 'bg-red-200 text-red-700'
+                }`}>
+                  <DollarSign className="w-6 h-6" />
+                </div>
+                <h3 className={`font-medium mb-1 ${reporteVentas.ganancia >= 0 ? 'text-emerald-800' : 'text-red-800'}`}>
+                  Ganancia Neta
+                </h3>
+                <p className={`text-4xl font-black ${reporteVentas.ganancia >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                  ${reporteVentas.ganancia.toLocaleString()}
+                </p>
+              </div>
+            </div>
+
+            {/* Productos Vendidos */}
+            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200">
+              <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                <Package className="w-5 h-5 text-indigo-500" />
+                Productos Vendidos ({reporteFecha})
+              </h2>
+              
+              {reporteProductos.length === 0 ? (
+                <div className="text-center text-gray-500 py-10">
+                  No hay ventas registradas para esta fecha.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-gray-200 text-sm uppercase tracking-wider text-gray-500">
+                        <th className="pb-3 font-medium">Producto</th>
+                        <th className="pb-3 font-medium text-center">Cantidad Vendida</th>
+                        <th className="pb-3 font-medium text-right">Total Generado</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {reporteProductos.map((prod, idx) => (
+                        <tr key={idx} className="text-sm">
+                          <td className="py-3 font-medium text-gray-900">{prod.nombre}</td>
+                          <td className="py-3 text-center">
+                            <span className="bg-gray-100 text-gray-800 px-3 py-1 rounded-full font-bold">
+                              {prod.cantidad}
+                            </span>
+                          </td>
+                          <td className="py-3 text-right font-bold text-emerald-600">
+                            ${prod.total.toLocaleString()}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

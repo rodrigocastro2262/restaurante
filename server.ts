@@ -59,6 +59,14 @@ db.exec(`
       creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
   );
+
+  CREATE TABLE IF NOT EXISTS gastos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      descripcion VARCHAR(255),
+      categoria VARCHAR(50),
+      monto REAL,
+      fecha DATETIME DEFAULT CURRENT_TIMESTAMP
+  );
 `);
 
 try {
@@ -103,43 +111,45 @@ if (mesasCount.count === 0) {
   else db.exec("UPDATE mesas SET nombre = 'Sala Verde' WHERE id = 22");
 }
 
-  const insertCategoria = db.prepare('INSERT INTO categorias (id, nombre) VALUES (?, ?)');
-  const categorias = [
-    [1, 'Heladería'], [2, 'Comidas Rápidas'], [3, 'Bebidas Frías'],
-    [4, 'Bebidas Calientes'], [5, 'Infantiles'], [6, 'Juegos']
-  ];
-  categorias.forEach(c => insertCategoria.run(c[0], c[1]));
+  const categoriasCount = db.prepare('SELECT COUNT(*) as count FROM categorias').get() as { count: number };
+  if (categoriasCount.count === 0) {
+    const insertCategoria = db.prepare('INSERT INTO categorias (id, nombre) VALUES (?, ?)');
+    const categorias = [
+      [1, 'Heladería'], [2, 'Comidas Rápidas'], [3, 'Bebidas Frías'],
+      [4, 'Bebidas Calientes'], [5, 'Infantiles'], [6, 'Juegos']
+    ];
+    categorias.forEach(c => insertCategoria.run(c[0], c[1]));
 
-  const insertProducto = db.prepare('INSERT INTO productos (id, categoria_id, nombre, precio) VALUES (?, ?, ?, ?)');
-  const productos = [
-    [1, 1, 'Cono de helado', 3500], [2, 1, 'cono 2 sabores', 6000], [3, 1, 'cono 3 sabores', 9000],
-    [4, 1, 'canasta de helado', 6000], [5, 1, 'canasta 2 sabores', 8500], [6, 1, 'canasta 3 sabores', 11000],
-    [7, 1, 'ensalada MAX', 17000], [8, 1, 'ensalada mini', 13000], [9, 1, 'ensalada MAX sin H', 15000],
-    [10, 1, 'ensalada mini sin H', 11000], [11, 1, 'banana split', 13000], [12, 1, 'pasion chocolate', 13000],
-    [13, 1, 'copa oreo', 13000], [14, 1, 'Copa sofi', 13000], [15, 1, 'Copa victoria', 13000],
-    [16, 1, 'Fresas con crema', 13000], [17, 1, 'Brawnie con helado', 13000], [18, 1, 'Creps con Helado', 16000],
-    [19, 1, 'Frutihelado', 16000], [20, 1, 'Copa sin Helado', 15000], [21, 1, 'Oblea ', 5000],
-    [22, 1, 'picada de fruta', 11000], [23, 1, 'Adicional de Queso', 3000], [24, 1, 'Paleta de Agua', 2500],
-    [25, 1, 'Paleta de Mongo B', 3000], [26, 1, 'Chococono', 4000], [27, 1, 'adicional de helado', 2500],
-    [28, 2, 'Hamburguesa', 17000], [29, 2, 'hamburguesa con Papas', 20000], [30, 2, 'Hamburguesa MAX', 25000],
-    [31, 2, 'Hamburguesa Max papas', 6000], [32, 2, 'Sandwche cubano', 8500], [33, 2, 'Sanduche cubano con papas', 11000],
-    [34, 2, 'Creps de pollo', 17000], [35, 2, 'Creps de pollo con papas', 20000], [36, 2, 'Hamburguesa mini', 9000],
-    [37, 2, 'Hamburguesa mini con papas', 12000], [38, 2, 'Sandwichs', 5000], [39, 2, 'Sancwichs de pollo', 7000],
-    [40, 2, 'Porcion de papas', 6000], [41, 2, 'Adicional de Carne', 5000],
-    [42, 3, 'Malteada', 7000], [43, 3, 'Granizado de Cafe', 7000], [44, 3, 'Milo friio', 7000],
-    [45, 3, 'Tamarindo Escarcha', 7000], [46, 3, 'Soda Escarcha', 7000], [47, 3, 'Jugo en leche', 6000],
-    [48, 1, 'Jugo en Agua', 5000], [49, 3, 'Hit Cajita', 2500], [50, 3, 'Hit Litro Caja', 7000],
-    [51, 3, 'Agua Pequeña', 1500], [52, 3, 'Agua Grande', 1500], [53, 3, 'Gaseosa', 3000],
-    [54, 4, 'Milo Caliente', 3500], [55, 4, 'Cafe', 1500], [56, 4, 'Aromatica', 1500],
-    [57, 4, 'Pintadito', 2000], [58, 4, 'Aromatica Con Frutas', 7000],
-    [59, 5, 'Araña', 7000], [60, 5, 'Gato', 7000], [61, 5, 'Raton', 7000],
-    [62, 5, 'Elefante', 7000], [63, 5, 'Conejo', 7000], [64, 5, 'Gusano', 7000],
-    [65, 5, 'Bonbon', 3000], [66, 5, 'Huevo Sorpresa', 5000],
-    [67, 6, '15 minutos', 3000], [68, 6, '30 minutos', 5000], [69, 6, '60 minutos', 7000],
-    [70, 6, 'ficha', 10000], [71, 6, '500', 500]
-  ];
-  productos.forEach(p => insertProducto.run(p[0], p[1], p[2], p[3]));
-}
+    const insertProducto = db.prepare('INSERT INTO productos (id, categoria_id, nombre, precio) VALUES (?, ?, ?, ?)');
+    const productos = [
+      [1, 1, 'Cono de helado', 3500], [2, 1, 'cono 2 sabores', 6000], [3, 1, 'cono 3 sabores', 9000],
+      [4, 1, 'canasta de helado', 6000], [5, 1, 'canasta 2 sabores', 8500], [6, 1, 'canasta 3 sabores', 11000],
+      [7, 1, 'ensalada MAX', 17000], [8, 1, 'ensalada mini', 13000], [9, 1, 'ensalada MAX sin H', 15000],
+      [10, 1, 'ensalada mini sin H', 11000], [11, 1, 'banana split', 13000], [12, 1, 'pasion chocolate', 13000],
+      [13, 1, 'copa oreo', 13000], [14, 1, 'Copa sofi', 13000], [15, 1, 'Copa victoria', 13000],
+      [16, 1, 'Fresas con crema', 13000], [17, 1, 'Brawnie con helado', 13000], [18, 1, 'Creps con Helado', 16000],
+      [19, 1, 'Frutihelado', 16000], [20, 1, 'Copa sin Helado', 15000], [21, 1, 'Oblea ', 5000],
+      [22, 1, 'picada de fruta', 11000], [23, 1, 'Adicional de Queso', 3000], [24, 1, 'Paleta de Agua', 2500],
+      [25, 1, 'Paleta de Mongo B', 3000], [26, 1, 'Chococono', 4000], [27, 1, 'adicional de helado', 2500],
+      [28, 2, 'Hamburguesa', 17000], [29, 2, 'hamburguesa con Papas', 20000], [30, 2, 'Hamburguesa MAX', 25000],
+      [31, 2, 'Hamburguesa Max papas', 6000], [32, 2, 'Sandwche cubano', 8500], [33, 2, 'Sanduche cubano con papas', 11000],
+      [34, 2, 'Creps de pollo', 17000], [35, 2, 'Creps de pollo con papas', 20000], [36, 2, 'Hamburguesa mini', 9000],
+      [37, 2, 'Hamburguesa mini con papas', 12000], [38, 2, 'Sandwichs', 5000], [39, 2, 'Sancwichs de pollo', 7000],
+      [40, 2, 'Porcion de papas', 6000], [41, 2, 'Adicional de Carne', 5000],
+      [42, 3, 'Malteada', 7000], [43, 3, 'Granizado de Cafe', 7000], [44, 3, 'Milo friio', 7000],
+      [45, 3, 'Tamarindo Escarcha', 7000], [46, 3, 'Soda Escarcha', 7000], [47, 3, 'Jugo en leche', 6000],
+      [48, 1, 'Jugo en Agua', 5000], [49, 3, 'Hit Cajita', 2500], [50, 3, 'Hit Litro Caja', 7000],
+      [51, 3, 'Agua Pequeña', 1500], [52, 3, 'Agua Grande', 1500], [53, 3, 'Gaseosa', 3000],
+      [54, 4, 'Milo Caliente', 3500], [55, 4, 'Cafe', 1500], [56, 4, 'Aromatica', 1500],
+      [57, 4, 'Pintadito', 2000], [58, 4, 'Aromatica Con Frutas', 7000],
+      [59, 5, 'Araña', 7000], [60, 5, 'Gato', 7000], [61, 5, 'Raton', 7000],
+      [62, 5, 'Elefante', 7000], [63, 5, 'Conejo', 7000], [64, 5, 'Gusano', 7000],
+      [65, 5, 'Bonbon', 3000], [66, 5, 'Huevo Sorpresa', 5000],
+      [67, 6, '15 minutos', 3000], [68, 6, '30 minutos', 5000], [69, 6, '60 minutos', 7000],
+      [70, 6, 'ficha', 10000], [71, 6, '500', 500]
+    ];
+    productos.forEach(p => insertProducto.run(p[0], p[1], p[2], p[3]));
+  }
 
 async function startServer() {
   const app = express();
@@ -348,6 +358,77 @@ async function startServer() {
     transaction();
     events.emit('update');
     res.json({ success: true });
+  });
+
+  // Gastos
+  app.get('/api/gastos', (req, res) => {
+    const { fecha } = req.query;
+    let query = "SELECT * FROM gastos";
+    let params: any[] = [];
+    
+    if (fecha) {
+      query += " WHERE date(fecha) = date(?)";
+      params.push(fecha);
+    }
+    
+    query += " ORDER BY fecha DESC";
+    
+    const gastos = db.prepare(query).all(...params);
+    res.json(gastos);
+  });
+
+  app.post('/api/gastos', (req, res) => {
+    const { descripcion, categoria, monto, fecha } = req.body;
+    const result = db.prepare("INSERT INTO gastos (descripcion, categoria, monto, fecha) VALUES (?, ?, ?, COALESCE(?, CURRENT_TIMESTAMP))")
+      .run(descripcion, categoria, monto, fecha);
+    res.json({ success: true, id: result.lastInsertRowid });
+  });
+
+  // Ventas y Reportes
+  app.get('/api/reportes/ventas', (req, res) => {
+    const { fecha } = req.query;
+    let dateFilter = fecha ? "date(p.creado_en) = date(?)" : "date(p.creado_en) = date('now', 'localtime')";
+    let params = fecha ? [fecha] : [];
+
+    // Total ventas
+    const ventas = db.prepare(`
+      SELECT COALESCE(SUM(pa.monto), 0) as total
+      FROM pagos pa
+      JOIN pedidos p ON pa.pedido_id = p.id
+      WHERE ${dateFilter}
+    `).get(...params) as any;
+
+    // Total gastos
+    let gastosFilter = fecha ? "date(fecha) = date(?)" : "date(fecha) = date('now', 'localtime')";
+    const gastos = db.prepare(`
+      SELECT COALESCE(SUM(monto), 0) as total
+      FROM gastos
+      WHERE ${gastosFilter}
+    `).get(...params) as any;
+
+    res.json({
+      ventas: ventas.total,
+      gastos: gastos.total,
+      ganancia: ventas.total - gastos.total
+    });
+  });
+
+  app.get('/api/reportes/productos', (req, res) => {
+    const { fecha } = req.query;
+    let dateFilter = fecha ? "date(p.creado_en) = date(?)" : "date(p.creado_en) = date('now', 'localtime')";
+    let params = fecha ? [fecha] : [];
+
+    const productos = db.prepare(`
+      SELECT pr.nombre, SUM(pi.cantidad) as cantidad, SUM(pi.cantidad * pr.precio) as total
+      FROM pedido_items pi
+      JOIN pedidos p ON pi.pedido_id = p.id
+      JOIN productos pr ON pi.producto_id = pr.id
+      WHERE ${dateFilter} AND p.estado = 'pagado'
+      GROUP BY pr.id
+      ORDER BY cantidad DESC
+    `).all(...params);
+
+    res.json(productos);
   });
 
   // Error handler

@@ -138,15 +138,16 @@ export default function MeseroView() {
     const totalCart = cart.reduce((sum, item) => sum + (item.producto.precio * item.cantidad), 0);
 
     return (
-      <div className="flex h-full bg-gray-50">
-        {/* Left Panel - Menu */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="bg-white p-4 shadow-sm flex items-center gap-4">
-            <button onClick={() => setSelectedMesa(null)} className="p-2 hover:bg-gray-100 rounded-full">
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <h2 className="text-2xl font-bold">Mesa {selectedMesa.nombre}</h2>
-          </div>
+      <>
+        <div className="flex h-full bg-gray-50">
+          {/* Left Panel - Menu */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="bg-white p-4 shadow-sm flex items-center gap-4">
+              <button onClick={() => setSelectedMesa(null)} className="p-2 hover:bg-gray-100 rounded-full">
+                <ArrowLeft className="w-6 h-6" />
+              </button>
+              <h2 className="text-2xl font-bold">Mesa {selectedMesa.nombre}</h2>
+            </div>
           
           <div className="flex-1 overflow-y-auto p-4">
             <div className="grid grid-cols-3 gap-4 mb-8">
@@ -349,9 +350,11 @@ export default function MeseroView() {
           </div>
         </div>
       )}
-    </div>
-  );
-}
+      </>
+    );
+  }
+
+  return (
     <div className="p-6 h-full overflow-y-auto bg-gray-50">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Mapa de Mesas</h1>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
