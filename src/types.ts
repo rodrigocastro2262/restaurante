@@ -1,0 +1,39 @@
+export interface Mesa {
+  id: number;
+  numero: number;
+  estado: 'disponible' | 'ocupada';
+}
+
+export interface Categoria {
+  id: number;
+  nombre: string;
+}
+
+export interface Producto {
+  id: number;
+  categoria_id: number;
+  nombre: string;
+  precio: number;
+}
+
+export interface PedidoItem {
+  id: number;
+  pedido_id: number;
+  producto_id: number;
+  producto_nombre: string;
+  cantidad: number;
+  estado: 'pendiente' | 'preparando' | 'listo' | 'entregado';
+}
+
+export interface Pedido {
+  id: number;
+  mesa_id: number;
+  mesa_numero: number;
+  estado: 'abierto' | 'pagado';
+  creado_en: string;
+  juego_minutos: number | null;
+  juego_inicio: string | null;
+  juego_estado: 'activo' | 'pausado' | null;
+  juego_restante_ms: number | null;
+  items: PedidoItem[];
+}

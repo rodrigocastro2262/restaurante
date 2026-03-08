@@ -1,0 +1,323 @@
+import express from 'express';
+import { createServer as createViteServer } from 'vite';
+import Database from 'better-sqlite3';
+import { EventEmitter } from 'events';
+
+const db = new Database('restaurante.db');
+const events = new EventEmitter();
+
+// Initialize Database
+db.exec(`
+  CREATE TABLE IF NOT EXISTS mesas (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      numero INT,
+      estado VARCHAR(22) DEFAULT 'disponible'
+  );
+
+  CREATE TABLE IF NOT EXISTS categorias (
+      id INTEGER PRIMARY KEY,
+      nombre VARCHAR(50)
+  );
+
+  CREATE TABLE IF NOT EXISTS productos (
+      id INTEGER PRIMARY KEY,
+      categoria_id INT,
+      nombre VARCHAR(100),
+      precio REAL,
+      FOREIGN KEY (categoria_id) REFERENCES categorias(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS pedidos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      mesa_id INT,
+      estado VARCHAR(20) DEFAULT 'abierto',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      juego_minutos INT DEFAULT 0,
+      juego_inicio DATETIME,
+      juego_estado VARCHAR(20) DEFAULT 'activo',
+      juego_restante_ms INTEGER DEFAULT 0,
+      FOREIGN KEY (mesa_id) REFERENCES mesas(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS pedido_items (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id INT,
+      producto_id INT,
+      cantidad INT,
+      estado VARCHAR(20) DEFAULT 'pendiente',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (pedido_id) REFERENCES pedidos(id),
+      FOREIGN KEY (producto_id) REFERENCES productos(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS pagos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      pedido_id INT,
+      metodo VARCHAR(50),
+      monto REAL,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (pedido_id) REFERENCES pedidos(id)
+  );
+`);
+
+try {
+  db.exec("ALTER TABLE pedidos ADD COLUMN juego_minutos INT DEFAULT 0");
+  db.exec("ALTER TABLE pedidos ADD COLUMN juego_inicio DATETIME");
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE pedidos ADD COLUMN juego_estado VARCHAR(20) DEFAULT 'activo'");
+  db.exec("ALTER TABLE pedidos ADD COLUMN juego_restante_ms INTEGER DEFAULT 0");
+} catch (e) {}
+
+// Seed Data
+const mesasCount = db.prepare('SELECT COUNT(*) as count FROM mesas').get() as { count: number };
+if (mesasCount.count === 0) {
+  const insertMesa = db.prepare('INSERT INTO mesas (numero) VALUES (?)');
+  for (let i = 1; i <= 22; i++) {
+    insertMesa.run(i);
+  }
+
+  const insertCategoria = db.prepare('INSERT INTO categorias (id, nombre) VALUES (?, ?)');
+  const categorias = [
+    [1, 'Heladería'], [2, 'Comidas Rápidas'], [3, 'Bebidas Frías'],
+    [4, 'Bebidas Calientes'], [5, 'Infantiles'], [6, 'Juegos']
+  ];
+  categorias.forEach(c => insertCategoria.run(c[0], c[1]));
+
+  const insertProducto = db.prepare('INSERT INTO productos (id, categoria_id, nombre, precio) VALUES (?, ?, ?, ?)');
+  const productos = [
+    [1, 1, 'Cono de helado', 3500], [2, 1, 'cono 2 sabores', 6000], [3, 1, 'cono 3 sabores', 9000],
+    [4, 1, 'canasta de helado', 6000], [5, 1, 'canasta 2 sabores', 8500], [6, 1, 'canasta 3 sabores', 11000],
+    [7, 1, 'ensalada MAX', 17000], [8, 1, 'ensalada mini', 13000], [9, 1, 'ensalada MAX sin H', 15000],
+    [10, 1, 'ensalada mini sin H', 11000], [11, 1, 'banana split', 13000], [12, 1, 'pasion chocolate', 13000],
+    [13, 1, 'copa oreo', 13000], [14, 1, 'Copa sofi', 13000], [15, 1, 'Copa victoria', 13000],
+    [16, 1, 'Fresas con crema', 13000], [17, 1, 'Brawnie con helado', 13000], [18, 1, 'Creps con Helado', 16000],
+    [19, 1, 'Frutihelado', 16000], [20, 1, 'Copa sin Helado', 15000], [21, 1, 'Oblea ', 5000],
+    [22, 1, 'picada de fruta', 11000], [23, 1, 'Adicional de Queso', 3000], [24, 1, 'Paleta de Agua', 2500],
+    [25, 1, 'Paleta de Mongo B', 3000], [26, 1, 'Chococono', 4000], [27, 1, 'adicional de helado', 2500],
+    [28, 2, 'Hamburguesa', 17000], [29, 2, 'hamburguesa con Papas', 20000], [30, 2, 'Hamburguesa MAX', 25000],
+    [31, 2, 'Hamburguesa Max papas', 6000], [32, 2, 'Sandwche cubano', 8500], [33, 2, 'Sanduche cubano con papas', 11000],
+    [34, 2, 'Creps de pollo', 17000], [35, 2, 'Creps de pollo con papas', 20000], [36, 2, 'Hamburguesa mini', 9000],
+    [37, 2, 'Hamburguesa mini con papas', 12000], [38, 2, 'Sandwichs', 5000], [39, 2, 'Sancwichs de pollo', 7000],
+    [40, 2, 'Porcion de papas', 6000], [41, 2, 'Adicional de Carne', 5000],
+    [42, 3, 'Malteada', 7000], [43, 3, 'Granizado de Cafe', 7000], [44, 3, 'Milo friio', 7000],
+    [45, 3, 'Tamarindo Escarcha', 7000], [46, 3, 'Soda Escarcha', 7000], [47, 3, 'Jugo en leche', 6000],
+    [48, 1, 'Jugo en Agua', 5000], [49, 3, 'Hit Cajita', 2500], [50, 3, 'Hit Litro Caja', 7000],
+    [51, 3, 'Agua Pequeña', 1500], [52, 3, 'Agua Grande', 1500], [53, 3, 'Gaseosa', 3000],
+    [54, 4, 'Milo Caliente', 3500], [55, 4, 'Cafe', 1500], [56, 4, 'Aromatica', 1500],
+    [57, 4, 'Pintadito', 2000], [58, 4, 'Aromatica Con Frutas', 7000],
+    [59, 5, 'Araña', 7000], [60, 5, 'Gato', 7000], [61, 5, 'Raton', 7000],
+    [62, 5, 'Elefante', 7000], [63, 5, 'Conejo', 7000], [64, 5, 'Gusano', 7000],
+    [65, 5, 'Bonbon', 3000], [66, 5, 'Huevo Sorpresa', 5000],
+    [67, 6, '15 minutos', 3000], [68, 6, '30 minutos', 5000], [69, 6, '60 minutos', 7000],
+    [70, 6, 'ficha', 10000], [71, 6, '500', 500]
+  ];
+  productos.forEach(p => insertProducto.run(p[0], p[1], p[2], p[3]));
+}
+
+async function startServer() {
+  const app = express();
+  const PORT = 3000;
+
+  app.use(express.json());
+
+  // SSE Endpoint for real-time updates
+  app.get('/api/events', (req, res) => {
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.flushHeaders();
+
+    const onUpdate = () => {
+      res.write(`data: update\n\n`);
+    };
+
+    events.on('update', onUpdate);
+
+    req.on('close', () => {
+      events.off('update', onUpdate);
+    });
+  });
+
+  // API Routes
+  app.get('/api/mesas', (req, res) => {
+    const mesas = db.prepare('SELECT * FROM mesas').all();
+    res.json(mesas);
+  });
+
+  app.get('/api/categorias', (req, res) => {
+    const categorias = db.prepare('SELECT * FROM categorias').all();
+    res.json(categorias);
+  });
+
+  app.get('/api/productos', (req, res) => {
+    const productos = db.prepare('SELECT * FROM productos').all();
+    res.json(productos);
+  });
+
+  // Get active orders (for KDS and Admin)
+  app.get('/api/pedidos/activos', (req, res) => {
+    const pedidos = db.prepare(`
+      SELECT p.id, p.mesa_id, m.numero as mesa_numero, p.estado, p.creado_en, p.juego_minutos, p.juego_inicio, p.juego_estado, p.juego_restante_ms
+      FROM pedidos p
+      JOIN mesas m ON p.mesa_id = m.id
+      WHERE p.estado = 'abierto'
+    `).all();
+
+    const itemsStmt = db.prepare(`
+      SELECT pi.id, pi.pedido_id, pi.producto_id, pr.nombre as producto_nombre, pi.cantidad, pi.estado
+      FROM pedido_items pi
+      JOIN productos pr ON pi.producto_id = pr.id
+      WHERE pi.pedido_id = ?
+    `);
+
+    const result = pedidos.map((p: any) => ({
+      ...p,
+      items: itemsStmt.all(p.id)
+    }));
+
+    res.json(result);
+  });
+
+  // Create or add to order
+  app.post('/api/pedidos', (req, res) => {
+    const { mesa_id, items } = req.body;
+    
+    const transaction = db.transaction(() => {
+      let pedido = db.prepare("SELECT id, juego_minutos, juego_inicio, juego_estado, juego_restante_ms FROM pedidos WHERE mesa_id = ? AND estado = 'abierto'").get(mesa_id) as any;
+      
+      if (!pedido) {
+        const result = db.prepare("INSERT INTO pedidos (mesa_id) VALUES (?)").run(mesa_id);
+        pedido = { id: result.lastInsertRowid, juego_minutos: 0, juego_estado: 'activo', juego_restante_ms: 0 };
+        db.prepare("UPDATE mesas SET estado = 'ocupada' WHERE id = ?").run(mesa_id);
+      }
+
+      let newGameItem = items.find((i: any) => [67, 68, 69, 70].includes(i.producto_id));
+      
+      if (newGameItem) {
+        // Remove existing game items so they don't accumulate
+        db.prepare("DELETE FROM pedido_items WHERE pedido_id = ? AND producto_id IN (67, 68, 69, 70)").run(pedido.id);
+      }
+
+      const insertItem = db.prepare("INSERT INTO pedido_items (pedido_id, producto_id, cantidad) VALUES (?, ?, ?)");
+      for (const item of items) {
+        insertItem.run(pedido.id, item.producto_id, item.cantidad);
+      }
+
+      if (newGameItem) {
+        let newMinutes = 0;
+        if (newGameItem.producto_id === 67) newMinutes = 15;
+        if (newGameItem.producto_id === 68) newMinutes = 30;
+        if (newGameItem.producto_id === 69) newMinutes = 60;
+        if (newGameItem.producto_id === 70) newMinutes = 0; // Ficha
+
+        if (newMinutes > 0) {
+          if (!pedido.juego_inicio) {
+            const now = new Date().toISOString();
+            db.prepare("UPDATE pedidos SET juego_minutos = ?, juego_inicio = ?, juego_estado = 'activo', juego_restante_ms = ? WHERE id = ?")
+              .run(newMinutes, now, newMinutes * 60000, pedido.id);
+          } else {
+            if (pedido.juego_estado === 'pausado') {
+              const diffMs = (newMinutes - (pedido.juego_minutos || 0)) * 60000;
+              const newRemainingMs = Math.max(0, (pedido.juego_restante_ms || 0) + diffMs);
+              db.prepare("UPDATE pedidos SET juego_minutos = ?, juego_restante_ms = ? WHERE id = ?")
+                .run(newMinutes, newRemainingMs, pedido.id);
+            } else {
+              db.prepare("UPDATE pedidos SET juego_minutos = ? WHERE id = ?")
+                .run(newMinutes, pedido.id);
+            }
+          }
+        } else {
+          // Ficha: clear timer
+          db.prepare("UPDATE pedidos SET juego_minutos = 0, juego_inicio = NULL, juego_estado = 'activo', juego_restante_ms = 0 WHERE id = ?").run(pedido.id);
+        }
+      }
+    });
+
+    transaction();
+    events.emit('update');
+    res.json({ success: true });
+  });
+
+  // Pause timer
+  app.post('/api/pedidos/:id/pausar', (req, res) => {
+    const { id } = req.params;
+    const pedido = db.prepare("SELECT juego_inicio, juego_minutos, juego_estado, juego_restante_ms FROM pedidos WHERE id = ?").get(id) as any;
+    
+    if (pedido && pedido.juego_estado === 'activo' && pedido.juego_inicio) {
+      const elapsedMs = Date.now() - new Date(pedido.juego_inicio).getTime();
+      const totalMs = pedido.juego_minutos * 60000;
+      const remainingMs = Math.max(0, totalMs - elapsedMs);
+      
+      db.prepare("UPDATE pedidos SET juego_estado = 'pausado', juego_restante_ms = ? WHERE id = ?").run(remainingMs, id);
+      events.emit('update');
+    }
+    res.json({ success: true });
+  });
+
+  // Resume timer
+  app.post('/api/pedidos/:id/reanudar', (req, res) => {
+    const { id } = req.params;
+    const pedido = db.prepare("SELECT juego_minutos, juego_estado, juego_restante_ms FROM pedidos WHERE id = ?").get(id) as any;
+    
+    if (pedido && pedido.juego_estado === 'pausado') {
+      const totalMs = pedido.juego_minutos * 60000;
+      const elapsedMs = totalMs - pedido.juego_restante_ms;
+      const newInicio = new Date(Date.now() - elapsedMs).toISOString();
+      
+      db.prepare("UPDATE pedidos SET juego_estado = 'activo', juego_inicio = ? WHERE id = ?").run(newInicio, id);
+      events.emit('update');
+    }
+    res.json({ success: true });
+  });
+
+  // Update item status (KDS)
+  app.put('/api/pedido_items/:id/estado', (req, res) => {
+    const { id } = req.params;
+    const { estado } = req.body; // 'pendiente', 'preparando', 'listo'
+    
+    db.prepare("UPDATE pedido_items SET estado = ? WHERE id = ?").run(estado, id);
+    events.emit('update');
+    res.json({ success: true });
+  });
+
+  // Close table and pay
+  app.post('/api/pedidos/:id/pagar', (req, res) => {
+    const { id } = req.params;
+    const { metodo, monto } = req.body;
+
+    const transaction = db.transaction(() => {
+      const pedido = db.prepare("SELECT mesa_id FROM pedidos WHERE id = ?").get(id) as any;
+      if (pedido) {
+        db.prepare("INSERT INTO pagos (pedido_id, metodo, monto) VALUES (?, ?, ?)").run(id, metodo, monto);
+        db.prepare("UPDATE pedidos SET estado = 'pagado' WHERE id = ?").run(id);
+        db.prepare("UPDATE mesas SET estado = 'disponible' WHERE id = ?").run(pedido.mesa_id);
+      }
+    });
+
+    transaction();
+    events.emit('update');
+    res.json({ success: true });
+  });
+
+  // Error handler
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error('Server Error:', err);
+    res.status(500).json({ error: err.message });
+  });
+
+  if (process.env.NODE_ENV !== 'production') {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: 'spa',
+    });
+    app.use(vite.middlewares);
+  }
+
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`Server running on http://localhost:${PORT}`);
+  });
+}
+
+startServer();

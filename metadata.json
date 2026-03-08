@@ -1,0 +1,5 @@
+{
+  "name": "Restaurante POS & KDS",
+  "description": "Sistema de toma de pedidos para restaurante con vista de mesero, KDS para cocina y módulo de administración/pagos.",
+  "requestFramePermissions": []
+}
