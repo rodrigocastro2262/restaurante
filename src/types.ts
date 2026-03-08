@@ -1,6 +1,7 @@
 export interface Mesa {
   id: number;
   numero: number;
+  nombre: string;
   estado: 'disponible' | 'ocupada';
 }
 
@@ -28,7 +29,7 @@ export interface PedidoItem {
 export interface Pedido {
   id: number;
   mesa_id: number;
-  mesa_numero: number;
+  mesa_numero: string;
   estado: 'abierto' | 'pagado';
   creado_en: string;
   juego_minutos: number | null;

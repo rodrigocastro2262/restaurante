@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Mesa, Categoria, Producto, Pedido } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
-import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play } from 'lucide-react';
+import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X } from 'lucide-react';
 
 export default function MeseroView() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
@@ -12,6 +12,15 @@ export default function MeseroView() {
   const [selectedCategoria, setSelectedCategoria] = useState<number | null>(null);
   const [cart, setCart] = useState<{ producto: Producto; cantidad: number }[]>([]);
   const [pedidosActivos, setPedidosActivos] = useState<Pedido[]>([]);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo');
+
+  const paymentMethods = [
+    { id: 'Efectivo', icon: DollarSign },
+    { id: 'Cuenta de Ahorros', icon: Building2 },
+    { id: 'Nequi', icon: Wallet },
+    { id: 'Daviplata', icon: Wallet },
+  ];
 
   const fetchData = useCallback(async () => {
     try {
@@ -76,6 +85,11 @@ export default function MeseroView() {
   const submitOrder = async () => {
     if (!selectedMesa || cart.length === 0) return;
     
+    if (selectedMesa.id === 1) {
+      setShowPaymentModal(true);
+      return;
+    }
+
     await fetch('/api/pedidos', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -87,6 +101,24 @@ export default function MeseroView() {
     
     setCart([]);
     setSelectedMesa(null);
+  };
+
+  const processDirectPayment = async () => {
+    if (!selectedMesa || cart.length === 0) return;
+
+    await fetch('/api/pedidos/pago-directo', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        mesa_id: selectedMesa.id,
+        metodo: paymentMethod,
+        items: cart.map(item => ({ producto_id: item.producto.id, cantidad: item.cantidad }))
+      })
+    });
+    
+    setCart([]);
+    setSelectedMesa(null);
+    setShowPaymentModal(false);
   };
 
   const pauseTimer = async (pedidoId: number) => {
@@ -113,7 +145,7 @@ export default function MeseroView() {
             <button onClick={() => setSelectedMesa(null)} className="p-2 hover:bg-gray-100 rounded-full">
               <ArrowLeft className="w-6 h-6" />
             </button>
-            <h2 className="text-2xl font-bold">Mesa {selectedMesa.numero}</h2>
+            <h2 className="text-2xl font-bold">Mesa {selectedMesa.nombre}</h2>
           </div>
           
           <div className="flex-1 overflow-y-auto p-4">
@@ -244,18 +276,82 @@ export default function MeseroView() {
               </div>
               <button
                 onClick={submitOrder}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg shadow-md transition-colors"
+                className={`w-full py-3 rounded-xl font-bold text-lg shadow-md transition-colors flex items-center justify-center gap-2 ${
+                  selectedMesa.id === 1 
+                    ? 'bg-green-600 hover:bg-green-700 text-white'
+                    : 'bg-indigo-600 hover:bg-indigo-700 text-white'
+                }`}
               >
-                Enviar a Cocina
+                {selectedMesa.id === 1 ? (
+                  <>
+                    <DollarSign className="w-6 h-6" />
+                    Cobrar Pedido
+                  </>
+                ) : (
+                  <>
+                    <ChefHat className="w-6 h-6" />
+                    Enviar a Cocina
+                  </>
+                )}
               </button>
             </div>
           )}
         </div>
       </div>
-    );
-  }
 
-  return (
+      {/* Payment Modal for Mesa A */}
+      {showPaymentModal && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-4 border-b border-gray-200 bg-gray-900 text-white flex justify-between items-center">
+              <h2 className="text-xl font-bold">Cobrar {selectedMesa?.nombre}</h2>
+              <button onClick={() => setShowPaymentModal(false)} className="text-gray-400 hover:text-white">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div className="p-6">
+              <div className="mb-6">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-gray-600">Total a pagar:</span>
+                  <span className="text-3xl font-black text-gray-900">
+                    ${totalCart.toLocaleString()}
+                  </span>
+                </div>
+              </div>
+              <h3 className="font-bold text-gray-700 mb-3 uppercase text-sm tracking-wider">Método de Pago</h3>
+              <div className="grid grid-cols-2 gap-3 mb-6">
+                {paymentMethods.map(method => {
+                  const Icon = method.icon;
+                  return (
+                    <button
+                      key={method.id}
+                      onClick={() => setPaymentMethod(method.id)}
+                      className={`p-3 rounded-lg border flex flex-col items-center justify-center gap-2 transition-colors ${
+                        paymentMethod === method.id 
+                          ? 'bg-green-50 border-green-500 text-green-700 font-bold' 
+                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                      }`}
+                    >
+                      <Icon className="w-6 h-6" />
+                      <span className="text-sm text-center">{method.id}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <button
+                onClick={processDirectPayment}
+                className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-lg shadow-md transition-colors flex items-center justify-center gap-2"
+              >
+                <Check className="w-6 h-6" />
+                Confirmar Pago
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
     <div className="p-6 h-full overflow-y-auto bg-gray-50">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Mapa de Mesas</h1>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
@@ -269,7 +365,7 @@ export default function MeseroView() {
                 : 'bg-emerald-50 border-2 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
             }`}
           >
-            <span className="text-4xl font-black">{mesa.numero}</span>
+            <span className="text-2xl font-black text-center leading-tight">{mesa.nombre}</span>
             <span className={`text-xs font-bold uppercase tracking-wider px-3 py-1 rounded-full ${
               mesa.estado === 'ocupada' ? 'bg-red-200 text-red-800' : 'bg-emerald-200 text-emerald-800'
             }`}>

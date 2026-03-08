@@ -11,6 +11,7 @@ db.exec(`
   CREATE TABLE IF NOT EXISTS mesas (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       numero INT,
+      nombre VARCHAR(50),
       estado VARCHAR(22) DEFAULT 'disponible'
   );
 
@@ -61,6 +62,10 @@ db.exec(`
 `);
 
 try {
+  db.exec("ALTER TABLE mesas ADD COLUMN nombre VARCHAR(50)");
+} catch (e) {}
+
+try {
   db.exec("ALTER TABLE pedidos ADD COLUMN juego_minutos INT DEFAULT 0");
   db.exec("ALTER TABLE pedidos ADD COLUMN juego_inicio DATETIME");
 } catch (e) {}
@@ -73,10 +78,30 @@ try {
 // Seed Data
 const mesasCount = db.prepare('SELECT COUNT(*) as count FROM mesas').get() as { count: number };
 if (mesasCount.count === 0) {
-  const insertMesa = db.prepare('INSERT INTO mesas (numero) VALUES (?)');
-  for (let i = 1; i <= 22; i++) {
-    insertMesa.run(i);
+  const insertMesa = db.prepare('INSERT INTO mesas (numero, nombre) VALUES (?, ?)');
+  insertMesa.run(1, 'Mesa A');
+  for (let i = 2; i <= 19; i++) {
+    insertMesa.run(i, `${i - 1}`);
   }
+  insertMesa.run(20, 'Sala Roja');
+  insertMesa.run(21, 'Sala Blanca');
+  insertMesa.run(22, 'Sala Verde');
+} else {
+  // Update existing names
+  db.exec("UPDATE mesas SET nombre = 'Mesa A' WHERE id = 1");
+  for (let i = 2; i <= 19; i++) {
+    db.exec(`UPDATE mesas SET nombre = '${i - 1}' WHERE id = ${i}`);
+  }
+  db.exec("UPDATE mesas SET nombre = 'Sala Roja' WHERE id = 20");
+  
+  const count21 = db.prepare("SELECT COUNT(*) as c FROM mesas WHERE id = 21").get() as any;
+  if (count21.c === 0) db.exec("INSERT INTO mesas (id, numero, estado, nombre) VALUES (21, 21, 'disponible', 'Sala Blanca')");
+  else db.exec("UPDATE mesas SET nombre = 'Sala Blanca' WHERE id = 21");
+
+  const count22 = db.prepare("SELECT COUNT(*) as c FROM mesas WHERE id = 22").get() as any;
+  if (count22.c === 0) db.exec("INSERT INTO mesas (id, numero, estado, nombre) VALUES (22, 22, 'disponible', 'Sala Verde')");
+  else db.exec("UPDATE mesas SET nombre = 'Sala Verde' WHERE id = 22");
+}
 
   const insertCategoria = db.prepare('INSERT INTO categorias (id, nombre) VALUES (?, ?)');
   const categorias = [
@@ -159,7 +184,7 @@ async function startServer() {
   // Get active orders (for KDS and Admin)
   app.get('/api/pedidos/activos', (req, res) => {
     const pedidos = db.prepare(`
-      SELECT p.id, p.mesa_id, m.numero as mesa_numero, p.estado, p.creado_en, p.juego_minutos, p.juego_inicio, p.juego_estado, p.juego_restante_ms
+      SELECT p.id, p.mesa_id, m.nombre as mesa_numero, p.estado, p.creado_en, p.juego_minutos, p.juego_inicio, p.juego_estado, p.juego_restante_ms
       FROM pedidos p
       JOIN mesas m ON p.mesa_id = m.id
       WHERE p.estado = 'abierto'
@@ -178,6 +203,30 @@ async function startServer() {
     }));
 
     res.json(result);
+  });
+
+  // Direct payment for Mesa A (Counter orders)
+  app.post('/api/pedidos/pago-directo', (req, res) => {
+    const { mesa_id, items, metodo } = req.body;
+    
+    const transaction = db.transaction(() => {
+      const result = db.prepare("INSERT INTO pedidos (mesa_id, estado) VALUES (?, 'pagado')").run(mesa_id);
+      const pedidoId = result.lastInsertRowid;
+      
+      let total = 0;
+      const insertItem = db.prepare("INSERT INTO pedido_items (pedido_id, producto_id, cantidad, estado) VALUES (?, ?, ?, 'entregado')");
+      for (const item of items) {
+        insertItem.run(pedidoId, item.producto_id, item.cantidad);
+        const prod = db.prepare("SELECT precio FROM productos WHERE id = ?").get(item.producto_id) as any;
+        total += (prod.precio * item.cantidad);
+      }
+      
+      db.prepare("INSERT INTO pagos (pedido_id, metodo, monto) VALUES (?, ?, ?)").run(pedidoId, metodo || 'Efectivo', total);
+    });
+
+    transaction();
+    events.emit('update');
+    res.json({ success: true });
   });
 
   // Create or add to order
