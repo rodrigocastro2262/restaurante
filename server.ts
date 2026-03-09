@@ -68,6 +68,12 @@ db.exec(`
       monto REAL,
       fecha DATETIME DEFAULT CURRENT_TIMESTAMP
   );
+
+  CREATE TABLE IF NOT EXISTS sabores (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      nombre VARCHAR(50),
+      disponible BOOLEAN DEFAULT 1
+  );
 `);
 
 try {
@@ -89,6 +95,17 @@ try {
 } catch (e) {}
 
 // Seed Data
+const saboresCount = db.prepare('SELECT COUNT(*) as count FROM sabores').get() as { count: number };
+if (saboresCount.count === 0) {
+  const insertSabor = db.prepare('INSERT INTO sabores (nombre, disponible) VALUES (?, 1)');
+  const sabores = [
+    'Vainilla', 'Chocolate', 'Fresa', 'Ron Pasas', 
+    'Macadamia', 'Frutos Rojos', 'Limón', 'Mandarina', 
+    'Chicle', 'Brownie', 'Arequipe', 'Mora'
+  ];
+  sabores.forEach(s => insertSabor.run(s));
+}
+
 const mesasCount = db.prepare('SELECT COUNT(*) as count FROM mesas').get() as { count: number };
 if (mesasCount.count === 0) {
   const insertMesa = db.prepare('INSERT INTO mesas (numero, nombre) VALUES (?, ?)');
@@ -237,6 +254,23 @@ async function startServer() {
     } catch (e) {
       // Might fail if product is referenced in pedido_items
       res.status(400).json({ error: 'No se puede eliminar un producto que ya tiene pedidos. Intente marcarlo como no disponible.' });
+    }
+  });
+
+  app.get('/api/sabores', (req, res) => {
+    const sabores = db.prepare('SELECT * FROM sabores').all();
+    res.json(sabores);
+  });
+
+  app.put('/api/sabores/:id/toggle', (req, res) => {
+    const { id } = req.params;
+    const sabor = db.prepare('SELECT disponible FROM sabores WHERE id = ?').get(id) as any;
+    if (sabor) {
+      db.prepare('UPDATE sabores SET disponible = ? WHERE id = ?').run(sabor.disponible ? 0 : 1, id);
+      events.emit('update');
+      res.json({ success: true });
+    } else {
+      res.status(404).json({ error: 'Sabor no encontrado' });
     }
   });
 

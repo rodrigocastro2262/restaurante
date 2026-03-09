@@ -18,6 +18,12 @@ export interface Producto {
   disponible: number; // 0 or 1
 }
 
+export interface Sabor {
+  id: number;
+  nombre: string;
+  disponible: number; // 0 or 1
+}
+
 export interface PedidoItem {
   id: number;
   pedido_id: number;

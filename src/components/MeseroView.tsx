@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Mesa, Categoria, Producto, Pedido } from '../types';
+import { Mesa, Categoria, Producto, Pedido, Sabor } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
 import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search } from 'lucide-react';
@@ -8,6 +8,7 @@ export default function MeseroView() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [sabores, setSabores] = useState<Sabor[]>([]);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [selectedCategoria, setSelectedCategoria] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -25,17 +26,19 @@ export default function MeseroView() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [mesasRes, catRes, prodRes, pedidosRes] = await Promise.all([
+      const [mesasRes, catRes, prodRes, pedidosRes, saboresRes] = await Promise.all([
         fetch('/api/mesas'),
         fetch('/api/categorias'),
         fetch('/api/productos'),
-        fetch('/api/pedidos/activos')
+        fetch('/api/pedidos/activos'),
+        fetch('/api/sabores')
       ]);
       
       if (mesasRes.ok) setMesas(await mesasRes.json());
       if (catRes.ok) setCategorias(await catRes.json());
       if (prodRes.ok) setProductos(await prodRes.json());
       if (pedidosRes.ok) setPedidosActivos(await pedidosRes.json());
+      if (saboresRes.ok) setSabores(await saboresRes.json());
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -164,6 +167,11 @@ export default function MeseroView() {
     setCart([]);
   };
 
+  const toggleSabor = async (id: number) => {
+    await fetch(`/api/sabores/${id}/toggle`, { method: 'PUT' });
+    fetchData();
+  };
+
   if (selectedMesa) {
     const pedidoActual = getPedidoForMesa(selectedMesa.id);
     const totalCart = cart.reduce((sum, item) => sum + (item.producto.precio * item.cantidad), 0);
@@ -207,6 +215,29 @@ export default function MeseroView() {
             </div>
           
           <div className="flex-1 overflow-y-auto p-4">
+            {/* Sabores Quick Reference */}
+            <div className="mb-6">
+              <div className="flex items-center gap-2 mb-2">
+                <IceCream className="w-4 h-4 text-pink-500" />
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sabores Disponibles (Click para agotar)</h3>
+              </div>
+              <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {sabores.map(sabor => (
+                  <button
+                    key={sabor.id}
+                    onClick={() => toggleSabor(sabor.id)}
+                    className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                      sabor.disponible 
+                        ? 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100' 
+                        : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
+                    }`}
+                  >
+                    {sabor.nombre}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {!searchQuery && (
               <div className="grid grid-cols-3 gap-4 mb-8">
                 {categorias.map(cat => (
