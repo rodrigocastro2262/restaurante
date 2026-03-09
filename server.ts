@@ -247,6 +247,7 @@ async function startServer() {
       FROM pedidos p
       JOIN mesas m ON p.mesa_id = m.id
       WHERE p.estado = 'abierto'
+      ORDER BY p.creado_en ASC, p.id ASC
     `).all();
 
     const itemsStmt = db.prepare(`
@@ -254,6 +255,7 @@ async function startServer() {
       FROM pedido_items pi
       JOIN productos pr ON pi.producto_id = pr.id
       WHERE pi.pedido_id = ?
+      ORDER BY pi.id ASC
     `);
 
     const result = pedidos.map((p: any) => ({
@@ -296,10 +298,12 @@ async function startServer() {
     const transaction = db.transaction(() => {
       let pedido = db.prepare("SELECT id, juego_minutos, juego_inicio, juego_estado, juego_restante_ms FROM pedidos WHERE mesa_id = ? AND estado = 'abierto'").get(mesa_id) as any;
       
+      let isNewPedido = false;
       if (!pedido) {
         const result = db.prepare("INSERT INTO pedidos (mesa_id) VALUES (?)").run(mesa_id);
         pedido = { id: result.lastInsertRowid, juego_minutos: 0, juego_estado: 'activo', juego_restante_ms: 0 };
         db.prepare("UPDATE mesas SET estado = 'ocupada' WHERE id = ?").run(mesa_id);
+        isNewPedido = true;
       }
 
       let newGameItem = items.find((i: any) => [67, 68, 69, 70].includes(i.producto_id));
@@ -314,6 +318,13 @@ async function startServer() {
         insertItem.run(pedido.id, item.producto_id, item.cantidad);
       }
 
+      // If it's an existing order with an active timer, and we're adding new non-game items, restart the timer
+      if (!isNewPedido && !newGameItem && pedido.juego_minutos > 0) {
+        const now = new Date().toISOString();
+        db.prepare("UPDATE pedidos SET juego_inicio = ?, juego_estado = 'activo', juego_restante_ms = ? WHERE id = ?")
+          .run(now, pedido.juego_minutos * 60000, pedido.id);
+      }
+
       if (newGameItem) {
         let newMinutes = 0;
         if (newGameItem.producto_id === 67) newMinutes = 15;
@@ -322,7 +333,7 @@ async function startServer() {
         if (newGameItem.producto_id === 70) newMinutes = 0; // Ficha
 
         if (newMinutes > 0) {
-          if (!pedido.juego_inicio) {
+          if (!pedido.juego_inicio || (!isNewPedido && !newGameItem)) {
             const now = new Date().toISOString();
             db.prepare("UPDATE pedidos SET juego_minutos = ?, juego_inicio = ?, juego_estado = 'activo', juego_restante_ms = ? WHERE id = ?")
               .run(newMinutes, now, newMinutes * 60000, pedido.id);
@@ -333,8 +344,10 @@ async function startServer() {
               db.prepare("UPDATE pedidos SET juego_minutos = ?, juego_restante_ms = ? WHERE id = ?")
                 .run(newMinutes, newRemainingMs, pedido.id);
             } else {
-              db.prepare("UPDATE pedidos SET juego_minutos = ? WHERE id = ?")
-                .run(newMinutes, pedido.id);
+              // Restart timer when changing game time
+              const now = new Date().toISOString();
+              db.prepare("UPDATE pedidos SET juego_minutos = ?, juego_inicio = ?, juego_estado = 'activo', juego_restante_ms = ? WHERE id = ?")
+                .run(newMinutes, now, newMinutes * 60000, pedido.id);
             }
           }
         } else {
