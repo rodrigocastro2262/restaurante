@@ -2,6 +2,9 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import Database from 'better-sqlite3';
 import { EventEmitter } from 'events';
+import archiver from 'archiver';
+import fs from 'fs';
+import path from 'path';
 
 const db = new Database('restaurante.db');
 const events = new EventEmitter();
@@ -214,7 +217,7 @@ if (mesasCount.count === 0) {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = process.env.PORT || 3000;
 
   app.use(express.json());
 
@@ -234,6 +237,32 @@ async function startServer() {
     req.on('close', () => {
       events.off('update', onUpdate);
     });
+  });
+
+  // Download Source Code ZIP
+  app.get('/api/download-zip', (req, res) => {
+    res.attachment('restaurante-pos.zip');
+    const archive = archiver('zip', { zlib: { level: 9 } });
+    
+    archive.on('error', (err) => {
+      res.status(500).send({ error: err.message });
+    });
+    
+    archive.pipe(res);
+    
+    // Append files from the directory, excluding node_modules, .git, and the db
+    archive.glob('**/*', {
+      cwd: process.cwd(),
+      ignore: ['node_modules/**', '.git/**', 'dist/**', 'restaurante.db', 'restaurante.db-journal', '*.zip']
+    });
+    
+    // Also include hidden files like .env.example, .gitignore, .eslintrc.js
+    archive.glob('.*', {
+      cwd: process.cwd(),
+      ignore: ['.git/**', '.env']
+    });
+    
+    archive.finalize();
   });
 
   // API Routes
