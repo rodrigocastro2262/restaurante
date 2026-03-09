@@ -15,6 +15,7 @@ export interface Producto {
   categoria_id: number;
   nombre: string;
   precio: number;
+  disponible: number; // 0 or 1
 }
 
 export interface PedidoItem {

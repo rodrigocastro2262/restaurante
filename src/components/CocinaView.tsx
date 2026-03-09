@@ -1,10 +1,47 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Pedido } from '../types';
 import { useSSE } from '../hooks/useSSE';
-import { Clock, ChefHat, CheckCircle2, Volume2, VolumeX } from 'lucide-react';
+import { Clock, ChefHat, CheckCircle2, Volume2, VolumeX, Edit3 } from 'lucide-react';
+
+interface DraftOrder {
+  mesa_id: number;
+  items: { producto_id: number; producto_nombre: string; cantidad: number }[];
+  updated_at: number;
+}
+
+const WaitTimer = ({ creadoEn }: { creadoEn: string }) => {
+  const [minutes, setMinutes] = useState(0);
+
+  useEffect(() => {
+    const calculateTime = () => {
+      // SQLite CURRENT_TIMESTAMP is in UTC format 'YYYY-MM-DD HH:MM:SS'
+      const utcDateStr = creadoEn.replace(' ', 'T') + 'Z';
+      const created = new Date(utcDateStr).getTime();
+      const now = Date.now();
+      const diffMins = Math.floor((now - created) / 60000);
+      setMinutes(diffMins >= 0 ? diffMins : 0);
+    };
+
+    calculateTime();
+    const interval = setInterval(calculateTime, 30000); // Update every 30 seconds
+    return () => clearInterval(interval);
+  }, [creadoEn]);
+
+  const isLate = minutes >= 15;
+
+  return (
+    <span className={`text-xs font-bold flex items-center gap-1 px-2 py-1 rounded-full shadow-sm ${
+      isLate ? 'bg-red-500 text-white animate-pulse' : 'bg-gray-800 text-gray-300'
+    }`}>
+      <Clock className="w-3 h-3" />
+      {minutes} min esperando
+    </span>
+  );
+};
 
 export default function CocinaView() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [draftOrders, setDraftOrders] = useState<DraftOrder[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [announcedTimers, setAnnouncedTimers] = useState<Set<number>>(new Set());
   const [knownItemIds, setKnownItemIds] = useState<Set<number>>(new Set());
@@ -12,11 +49,13 @@ export default function CocinaView() {
 
   const fetchPedidos = useCallback(async () => {
     try {
-      const res = await fetch('/api/pedidos/activos');
-      if (res.ok) {
-        const data = await res.json();
-        setPedidos(data);
-      }
+      const [pedidosRes, draftRes] = await Promise.all([
+        fetch('/api/pedidos/activos'),
+        fetch('/api/pedidos/draft')
+      ]);
+      
+      if (pedidosRes.ok) setPedidos(await pedidosRes.json());
+      if (draftRes.ok) setDraftOrders(await draftRes.json());
     } catch (error) {
       console.error('Error fetching pedidos:', error);
     }
@@ -139,21 +178,43 @@ export default function CocinaView() {
         </button>
       </div>
 
-      {mesasActivas.length === 0 ? (
+      {mesasActivas.length === 0 && draftOrders.length === 0 ? (
         <div className="flex flex-col items-center justify-center h-64 text-gray-400">
           <CheckCircle2 className="w-16 h-16 mb-4 opacity-50" />
           <p className="text-xl font-medium">No hay pedidos pendientes en cocina</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-4">
+          {draftOrders.map(draft => (
+            <div key={`draft-${draft.mesa_id}`} className="bg-white rounded-2xl shadow-sm border-2 border-indigo-300 overflow-hidden flex flex-col relative opacity-80">
+              <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500 animate-pulse"></div>
+              <div className="bg-indigo-50 text-indigo-900 p-4 flex justify-between items-center border-b border-indigo-100">
+                <h2 className="text-2xl font-black flex items-center gap-2">
+                  <Edit3 className="w-5 h-5 text-indigo-500" />
+                  Mesa {draft.mesa_id}
+                </h2>
+                <span className="text-xs font-bold uppercase tracking-wider px-2 py-1 bg-indigo-200 text-indigo-800 rounded-full">
+                  Tomando Pedido...
+                </span>
+              </div>
+              <div className="p-4 flex-1 flex flex-col gap-3 bg-indigo-50/30">
+                {draft.items.map((item, idx) => (
+                  <div key={idx} className="bg-white p-3 rounded-xl border border-indigo-100 flex flex-col gap-2 shadow-sm">
+                    <div className="flex items-start gap-2">
+                      <span className="font-black text-lg text-indigo-900">{item.cantidad}x</span>
+                      <span className="text-gray-800 font-medium leading-tight pt-1">{item.producto_nombre}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
           {mesasActivas.map(pedido => (
             <div key={pedido.id} className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden flex flex-col">
               <div className="bg-gray-900 text-white p-4 flex justify-between items-center">
                 <h2 className="text-2xl font-black">Mesa {pedido.mesa_numero}</h2>
-                <span className="text-sm font-medium text-gray-300 flex items-center gap-1">
-                  <Clock className="w-4 h-4" />
-                  {new Date(pedido.creado_en).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
+                <WaitTimer creadoEn={pedido.creado_en} />
               </div>
               <div className="p-4 flex-1 flex flex-col gap-3 bg-gray-50">
                 {pedido.items.filter(i => i.estado !== 'entregado').map(item => (

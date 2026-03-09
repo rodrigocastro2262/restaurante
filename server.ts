@@ -25,6 +25,7 @@ db.exec(`
       categoria_id INT,
       nombre VARCHAR(100),
       precio REAL,
+      disponible BOOLEAN DEFAULT 1,
       FOREIGN KEY (categoria_id) REFERENCES categorias(id)
   );
 
@@ -81,6 +82,10 @@ try {
 try {
   db.exec("ALTER TABLE pedidos ADD COLUMN juego_estado VARCHAR(20) DEFAULT 'activo'");
   db.exec("ALTER TABLE pedidos ADD COLUMN juego_restante_ms INTEGER DEFAULT 0");
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE productos ADD COLUMN disponible BOOLEAN DEFAULT 1");
 } catch (e) {}
 
 // Seed Data
@@ -176,6 +181,23 @@ async function startServer() {
   });
 
   // API Routes
+  const draftOrders = new Map<number, any>();
+
+  app.post('/api/pedidos/draft', (req, res) => {
+    const { mesa_id, items } = req.body;
+    if (!items || items.length === 0) {
+      draftOrders.delete(mesa_id);
+    } else {
+      draftOrders.set(mesa_id, { mesa_id, items, updated_at: Date.now() });
+    }
+    events.emit('update');
+    res.json({ success: true });
+  });
+
+  app.get('/api/pedidos/draft', (req, res) => {
+    res.json(Array.from(draftOrders.values()));
+  });
+
   app.get('/api/mesas', (req, res) => {
     const mesas = db.prepare('SELECT * FROM mesas').all();
     res.json(mesas);
@@ -189,6 +211,33 @@ async function startServer() {
   app.get('/api/productos', (req, res) => {
     const productos = db.prepare('SELECT * FROM productos').all();
     res.json(productos);
+  });
+
+  app.post('/api/productos', (req, res) => {
+    const { categoria_id, nombre, precio, disponible } = req.body;
+    const result = db.prepare('INSERT INTO productos (categoria_id, nombre, precio, disponible) VALUES (?, ?, ?, ?)').run(categoria_id, nombre, precio, disponible === undefined ? 1 : disponible);
+    events.emit('update');
+    res.json({ id: result.lastInsertRowid, success: true });
+  });
+
+  app.put('/api/productos/:id', (req, res) => {
+    const { id } = req.params;
+    const { categoria_id, nombre, precio, disponible } = req.body;
+    db.prepare('UPDATE productos SET categoria_id = ?, nombre = ?, precio = ?, disponible = ? WHERE id = ?').run(categoria_id, nombre, precio, disponible, id);
+    events.emit('update');
+    res.json({ success: true });
+  });
+
+  app.delete('/api/productos/:id', (req, res) => {
+    const { id } = req.params;
+    try {
+      db.prepare('DELETE FROM productos WHERE id = ?').run(id);
+      events.emit('update');
+      res.json({ success: true });
+    } catch (e) {
+      // Might fail if product is referenced in pedido_items
+      res.status(400).json({ error: 'No se puede eliminar un producto que ya tiene pedidos. Intente marcarlo como no disponible.' });
+    }
   });
 
   // Get active orders (for KDS and Admin)
@@ -235,6 +284,7 @@ async function startServer() {
     });
 
     transaction();
+    draftOrders.delete(mesa_id);
     events.emit('update');
     res.json({ success: true });
   });
@@ -295,6 +345,7 @@ async function startServer() {
     });
 
     transaction();
+    draftOrders.delete(mesa_id);
     events.emit('update');
     res.json({ success: true });
   });

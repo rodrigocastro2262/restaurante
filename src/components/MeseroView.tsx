@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Mesa, Categoria, Producto, Pedido } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
-import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X } from 'lucide-react';
+import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search } from 'lucide-react';
 
 export default function MeseroView() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
@@ -10,6 +10,7 @@ export default function MeseroView() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [selectedCategoria, setSelectedCategoria] = useState<number | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const [cart, setCart] = useState<{ producto: Producto; cantidad: number }[]>([]);
   const [pedidosActivos, setPedidosActivos] = useState<Pedido[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -82,6 +83,24 @@ export default function MeseroView() {
     setCart(prev => prev.filter(item => item.producto.id !== productoId));
   };
 
+  // Sync draft order to server
+  useEffect(() => {
+    if (selectedMesa) {
+      fetch('/api/pedidos/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          mesa_id: selectedMesa.id,
+          items: cart.map(item => ({ 
+            producto_id: item.producto.id, 
+            producto_nombre: item.producto.nombre,
+            cantidad: item.cantidad 
+          }))
+        })
+      }).catch(console.error);
+    }
+  }, [cart, selectedMesa]);
+
   const submitOrder = async () => {
     if (!selectedMesa || cart.length === 0) return;
     
@@ -133,9 +152,29 @@ export default function MeseroView() {
     return pedidosActivos.find(p => p.mesa_id === mesaId);
   };
 
+  const handleBack = () => {
+    if (selectedMesa && cart.length > 0) {
+      fetch('/api/pedidos/draft', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mesa_id: selectedMesa.id, items: [] })
+      }).catch(console.error);
+    }
+    setSelectedMesa(null);
+    setCart([]);
+  };
+
   if (selectedMesa) {
     const pedidoActual = getPedidoForMesa(selectedMesa.id);
     const totalCart = cart.reduce((sum, item) => sum + (item.producto.precio * item.cantidad), 0);
+
+    const filteredProductos = productos.filter(p => {
+      if (p.disponible === 0) return false;
+      if (searchQuery) {
+        return p.nombre.toLowerCase().includes(searchQuery.toLowerCase());
+      }
+      return p.categoria_id === selectedCategoria;
+    });
 
     return (
       <>
@@ -143,29 +182,49 @@ export default function MeseroView() {
           {/* Left Panel - Menu */}
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="bg-white p-4 shadow-sm flex items-center gap-4">
-              <button onClick={() => setSelectedMesa(null)} className="p-2 hover:bg-gray-100 rounded-full">
+              <button onClick={handleBack} className="p-2 hover:bg-gray-100 rounded-full">
                 <ArrowLeft className="w-6 h-6" />
               </button>
               <h2 className="text-2xl font-bold">Mesa {selectedMesa.nombre}</h2>
+              <div className="flex-1 ml-4 relative">
+                <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Buscar producto..."
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    if (e.target.value) setSelectedCategoria(null);
+                  }}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+                />
+                {searchQuery && (
+                  <button onClick={() => setSearchQuery('')} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
             </div>
           
           <div className="flex-1 overflow-y-auto p-4">
-            <div className="grid grid-cols-3 gap-4 mb-8">
-              {categorias.map(cat => (
-                <button
-                  key={cat.id}
-                  onClick={() => setSelectedCategoria(cat.id)}
-                  className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors ${selectedCategoria === cat.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-indigo-50 border border-gray-200'}`}
-                >
-                  {getIconForCategory(cat.nombre)}
-                  <span className="font-medium text-sm text-center">{cat.nombre}</span>
-                </button>
-              ))}
-            </div>
+            {!searchQuery && (
+              <div className="grid grid-cols-3 gap-4 mb-8">
+                {categorias.map(cat => (
+                  <button
+                    key={cat.id}
+                    onClick={() => setSelectedCategoria(cat.id)}
+                    className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors ${selectedCategoria === cat.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-indigo-50 border border-gray-200'}`}
+                  >
+                    {getIconForCategory(cat.nombre)}
+                    <span className="font-medium text-sm text-center">{cat.nombre}</span>
+                  </button>
+                ))}
+              </div>
+            )}
 
-            {selectedCategoria && (
+            {(selectedCategoria || searchQuery) && (
               <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                {productos.filter(p => p.categoria_id === selectedCategoria).map(prod => (
+                {filteredProductos.map(prod => (
                   <button
                     key={prod.id}
                     onClick={() => addToCart(prod)}
@@ -175,6 +234,11 @@ export default function MeseroView() {
                     <div className="text-indigo-600 font-semibold">${prod.precio.toLocaleString()}</div>
                   </button>
                 ))}
+                {filteredProductos.length === 0 && (
+                  <div className="col-span-full text-center py-8 text-gray-500">
+                    No se encontraron productos.
+                  </div>
+                )}
               </div>
             )}
           </div>

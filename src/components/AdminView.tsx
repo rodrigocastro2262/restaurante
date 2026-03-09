@@ -1,10 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Pedido, Producto } from '../types';
+import { Pedido, Producto, Categoria } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
-import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package } from 'lucide-react';
+import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package, Edit3, Plus, Trash2, CheckCircle2, XCircle } from 'lucide-react';
 
-type AdminTab = 'caja' | 'gastos' | 'ventas';
+type AdminTab = 'caja' | 'gastos' | 'ventas' | 'productos';
+
+interface DraftOrder {
+  mesa_id: number;
+  items: { producto_id: number; producto_nombre: string; cantidad: number }[];
+  updated_at: number;
+}
 
 interface Gasto {
   id: number;
@@ -29,9 +35,15 @@ interface ReporteProducto {
 export default function AdminView() {
   const [activeTab, setActiveTab] = useState<AdminTab>('caja');
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
+  const [draftOrders, setDraftOrders] = useState<DraftOrder[]>([]);
   const [productos, setProductos] = useState<Producto[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo');
+  
+  // Productos state
+  const [editingProducto, setEditingProducto] = useState<Producto | null>(null);
+  const [newProducto, setNewProducto] = useState({ nombre: '', precio: '', categoria_id: 1, disponible: 1 });
   
   // Gastos state
   const [gastos, setGastos] = useState<Gasto[]>([]);
@@ -44,13 +56,17 @@ export default function AdminView() {
 
   const fetchData = useCallback(async () => {
     try {
-      const [pedidosRes, prodRes] = await Promise.all([
+      const [pedidosRes, prodRes, draftRes, catRes] = await Promise.all([
         fetch('/api/pedidos/activos'),
-        fetch('/api/productos')
+        fetch('/api/productos'),
+        fetch('/api/pedidos/draft'),
+        fetch('/api/categorias')
       ]);
       
       if (pedidosRes.ok) setPedidos(await pedidosRes.json());
       if (prodRes.ok) setProductos(await prodRes.json());
+      if (draftRes.ok) setDraftOrders(await draftRes.json());
+      if (catRes.ok) setCategorias(await catRes.json());
     } catch (error) {
       console.error('Error fetching data:', error);
     }
@@ -110,6 +126,51 @@ export default function AdminView() {
     setNewGasto({ descripcion: '', categoria: 'insumos', monto: '' });
     fetchGastos();
     if (activeTab === 'ventas') fetchReportes();
+  };
+
+  const handleSaveProducto = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (editingProducto) {
+      await fetch(`/api/productos/${editingProducto.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingProducto)
+      });
+      setEditingProducto(null);
+    } else {
+      if (!newProducto.nombre || !newProducto.precio) return;
+      await fetch('/api/productos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newProducto,
+          precio: parseFloat(newProducto.precio)
+        })
+      });
+      setNewProducto({ nombre: '', precio: '', categoria_id: 1, disponible: 1 });
+    }
+    fetchData();
+  };
+
+  const handleDeleteProducto = async (id: number) => {
+    if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
+      const res = await fetch(`/api/productos/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error);
+      } else {
+        fetchData();
+      }
+    }
+  };
+
+  const toggleProductAvailability = async (producto: Producto) => {
+    await fetch(`/api/productos/${producto.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ...producto, disponible: producto.disponible ? 0 : 1 })
+    });
+    fetchData();
   };
 
   const getProductPrice = (id: number) => {
@@ -291,6 +352,15 @@ export default function AdminView() {
             <TrendingUp className="w-4 h-4" />
             Ventas y Reportes
           </button>
+          <button
+            onClick={() => setActiveTab('productos')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-bold transition-colors ${
+              activeTab === 'productos' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <Package className="w-4 h-4" />
+            Productos
+          </button>
         </div>
         
         {(activeTab === 'gastos' || activeTab === 'ventas') && (
@@ -314,13 +384,29 @@ export default function AdminView() {
               <h1 className="text-3xl font-bold text-gray-900">Mesas Ocupadas</h1>
             </div>
 
-            {pedidos.length === 0 ? (
+            {pedidos.length === 0 && draftOrders.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-64 text-gray-400">
                 <Receipt className="w-16 h-16 mb-4 opacity-50" />
                 <p className="text-xl font-medium">No hay mesas ocupadas en este momento.</p>
               </div>
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {draftOrders.map(draft => (
+                  <div
+                    key={`draft-${draft.mesa_id}`}
+                    className="relative p-6 rounded-2xl flex flex-col items-center justify-center gap-3 shadow-sm bg-indigo-50 border-2 border-indigo-300 text-indigo-700 opacity-80"
+                  >
+                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500 animate-pulse rounded-t-xl"></div>
+                    <span className="text-4xl font-black">{draft.mesa_id}</span>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-full bg-indigo-200 text-indigo-800 text-center leading-tight">
+                      Tomando<br/>Pedido
+                    </span>
+                    <div className="absolute -top-2 -right-2 w-6 h-6 bg-indigo-500 rounded-full border-2 border-white flex items-center justify-center">
+                      <Edit3 className="w-3 h-3 text-white" />
+                    </div>
+                  </div>
+                ))}
+
                 {pedidos.map(pedido => (
                   <button
                     key={pedido.id}
@@ -537,6 +623,150 @@ export default function AdminView() {
                   </table>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'productos' && (
+          <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-1">
+              <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 sticky top-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                  {editingProducto ? <Edit3 className="w-5 h-5 text-blue-500" /> : <Plus className="w-5 h-5 text-green-500" />}
+                  {editingProducto ? 'Editar Producto' : 'Nuevo Producto'}
+                </h2>
+                <form onSubmit={handleSaveProducto} className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Nombre</label>
+                    <input
+                      type="text"
+                      required
+                      value={editingProducto ? editingProducto.nombre : newProducto.nombre}
+                      onChange={(e) => editingProducto 
+                        ? setEditingProducto({...editingProducto, nombre: e.target.value})
+                        : setNewProducto({...newProducto, nombre: e.target.value})}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      placeholder="Ej: Hamburguesa"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Precio</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="100"
+                      value={editingProducto ? editingProducto.precio : newProducto.precio}
+                      onChange={(e) => editingProducto
+                        ? setEditingProducto({...editingProducto, precio: parseFloat(e.target.value)})
+                        : setNewProducto({...newProducto, precio: e.target.value})}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                      placeholder="Ej: 15000"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-bold text-gray-700 mb-1">Categoría</label>
+                    <select
+                      value={editingProducto ? editingProducto.categoria_id : newProducto.categoria_id}
+                      onChange={(e) => editingProducto
+                        ? setEditingProducto({...editingProducto, categoria_id: parseInt(e.target.value)})
+                        : setNewProducto({...newProducto, categoria_id: parseInt(e.target.value)})}
+                      className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all bg-white"
+                    >
+                      {categorias.map(c => (
+                        <option key={c.id} value={c.id}>{c.nombre}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="pt-2 flex gap-2">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-4 rounded-xl transition-colors shadow-sm"
+                    >
+                      {editingProducto ? 'Guardar Cambios' : 'Agregar Producto'}
+                    </button>
+                    {editingProducto && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingProducto(null)}
+                        className="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3 px-4 rounded-xl transition-colors"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+                <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                  <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Package className="w-5 h-5 text-indigo-500" />
+                    Lista de Productos
+                  </h2>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500">
+                        <th className="p-4 font-bold">Producto</th>
+                        <th className="p-4 font-bold">Categoría</th>
+                        <th className="p-4 font-bold text-right">Precio</th>
+                        <th className="p-4 font-bold text-center">Estado</th>
+                        <th className="p-4 font-bold text-right">Acciones</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {productos.map(prod => {
+                        const cat = categorias.find(c => c.id === prod.categoria_id);
+                        return (
+                          <tr key={prod.id} className={`hover:bg-gray-50 transition-colors ${prod.disponible === 0 ? 'opacity-60 bg-gray-50' : ''}`}>
+                            <td className="p-4 font-medium text-gray-900">{prod.nombre}</td>
+                            <td className="p-4 text-sm text-gray-500">{cat?.nombre || 'Desconocida'}</td>
+                            <td className="p-4 text-right font-bold text-indigo-600">${prod.precio.toLocaleString()}</td>
+                            <td className="p-4 text-center">
+                              <button
+                                onClick={() => toggleProductAvailability(prod)}
+                                className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-colors ${
+                                  prod.disponible !== 0 
+                                    ? 'bg-green-100 text-green-700 hover:bg-green-200' 
+                                    : 'bg-red-100 text-red-700 hover:bg-red-200'
+                                }`}
+                              >
+                                {prod.disponible !== 0 ? (
+                                  <><CheckCircle2 className="w-3 h-3" /> Disponible</>
+                                ) : (
+                                  <><XCircle className="w-3 h-3" /> Agotado</>
+                                )}
+                              </button>
+                            </td>
+                            <td className="p-4 text-right">
+                              <div className="flex justify-end gap-2">
+                                <button
+                                  onClick={() => setEditingProducto(prod)}
+                                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                  title="Editar"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteProducto(prod.id)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Eliminar"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           </div>
         )}
