@@ -215,26 +215,75 @@ export default function MeseroView() {
             </div>
           
           <div className="flex-1 overflow-y-auto p-4">
-            {/* Sabores Quick Reference */}
-            <div className="mb-6">
-              <div className="flex items-center gap-2 mb-2">
-                <IceCream className="w-4 h-4 text-pink-500" />
-                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Sabores Disponibles (Click para agotar)</h3>
+            {/* Quick References */}
+            <div className="mb-6 space-y-4">
+              {/* Sabores de Helado */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <IceCream className="w-4 h-4 text-pink-500" />
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Helados (Click para agotar)</h3>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {sabores.filter(s => s.tipo === 'helado').map(sabor => (
+                    <button
+                      key={sabor.id}
+                      onClick={() => toggleSabor(sabor.id)}
+                      className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                        sabor.disponible 
+                          ? 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100' 
+                          : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
+                      }`}
+                    >
+                      {sabor.nombre}
+                    </button>
+                  ))}
+                </div>
               </div>
-              <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {sabores.map(sabor => (
-                  <button
-                    key={sabor.id}
-                    onClick={() => toggleSabor(sabor.id)}
-                    className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                      sabor.disponible 
-                        ? 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100' 
-                        : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
-                    }`}
-                  >
-                    {sabor.nombre}
-                  </button>
-                ))}
+
+              {/* Jugos */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Coffee className="w-4 h-4 text-orange-500" />
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Jugos</h3>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {sabores.filter(s => s.tipo === 'jugo').map(sabor => (
+                    <button
+                      key={sabor.id}
+                      onClick={() => toggleSabor(sabor.id)}
+                      className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                        sabor.disponible 
+                          ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' 
+                          : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
+                      }`}
+                    >
+                      {sabor.nombre}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Aromáticas */}
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <Coffee className="w-4 h-4 text-green-500" />
+                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Aromáticas</h3>
+                </div>
+                <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                  {sabores.filter(s => s.tipo === 'aromatica').map(sabor => (
+                    <button
+                      key={sabor.id}
+                      onClick={() => toggleSabor(sabor.id)}
+                      className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                        sabor.disponible 
+                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
+                          : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
+                      }`}
+                    >
+                      {sabor.nombre}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 

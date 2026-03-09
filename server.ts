@@ -94,16 +94,47 @@ try {
   db.exec("ALTER TABLE productos ADD COLUMN disponible BOOLEAN DEFAULT 1");
 } catch (e) {}
 
+try {
+  db.exec("ALTER TABLE sabores ADD COLUMN tipo VARCHAR(50) DEFAULT 'helado'");
+} catch (e) {}
+
 // Seed Data
-const saboresCount = db.prepare('SELECT COUNT(*) as count FROM sabores').get() as { count: number };
-if (saboresCount.count === 0) {
-  const insertSabor = db.prepare('INSERT INTO sabores (nombre, disponible) VALUES (?, 1)');
-  const sabores = [
-    'Vainilla', 'Chocolate', 'Fresa', 'Ron Pasas', 
-    'Macadamia', 'Frutos Rojos', 'Limón', 'Mandarina', 
-    'Chicle', 'Brownie', 'Arequipe', 'Mora'
-  ];
-  sabores.forEach(s => insertSabor.run(s));
+const opciones = [
+  { tipo: 'helado', nombre: 'Fresa' },
+  { tipo: 'helado', nombre: '3 Leches' },
+  { tipo: 'helado', nombre: 'Brownie' },
+  { tipo: 'helado', nombre: 'Ron Pasas' },
+  { tipo: 'helado', nombre: 'Veteado de Mora' },
+  { tipo: 'helado', nombre: 'Capuchino' },
+  { tipo: 'helado', nombre: 'Vainilla Chips' },
+  { tipo: 'helado', nombre: 'Jumbo' },
+  { tipo: 'helado', nombre: 'Chicle' },
+  { tipo: 'helado', nombre: 'Yogur Maracuyá' },
+  { tipo: 'helado', nombre: 'Nata Maní' },
+  { tipo: 'helado', nombre: 'Maracuyá' },
+  { tipo: 'jugo', nombre: 'Mora' },
+  { tipo: 'jugo', nombre: 'Maracuyá' },
+  { tipo: 'jugo', nombre: 'Guanábana' },
+  { tipo: 'aromatica', nombre: 'Manzanilla' },
+  { tipo: 'aromatica', nombre: 'Hierbabuena' }
+];
+
+const currentOpciones = db.prepare('SELECT nombre, tipo FROM sabores').all() as { nombre: string, tipo: string }[];
+const currentKeys = currentOpciones.map(o => `${o.tipo}-${o.nombre}`);
+const newKeys = opciones.map(o => `${o.tipo}-${o.nombre}`);
+
+// Remove old flavors that are not in the new list
+const toRemove = currentOpciones.filter(o => !newKeys.includes(`${o.tipo}-${o.nombre}`));
+if (toRemove.length > 0) {
+  const deleteStmt = db.prepare(`DELETE FROM sabores WHERE tipo = ? AND nombre = ?`);
+  toRemove.forEach(o => deleteStmt.run(o.tipo, o.nombre));
+}
+
+// Add new flavors that are not in the current list
+const toAdd = opciones.filter(o => !currentKeys.includes(`${o.tipo}-${o.nombre}`));
+if (toAdd.length > 0) {
+  const insertSabor = db.prepare('INSERT INTO sabores (nombre, tipo, disponible) VALUES (?, ?, 1)');
+  toAdd.forEach(o => insertSabor.run(o.nombre, o.tipo));
 }
 
 const mesasCount = db.prepare('SELECT COUNT(*) as count FROM mesas').get() as { count: number };

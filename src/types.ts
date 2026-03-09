@@ -21,6 +21,7 @@ export interface Producto {
 export interface Sabor {
   id: number;
   nombre: string;
+  tipo: 'helado' | 'jugo' | 'aromatica';
   disponible: number; // 0 or 1
 }
 
