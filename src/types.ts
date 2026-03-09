@@ -32,6 +32,8 @@ export interface PedidoItem {
   producto_nombre: string;
   cantidad: number;
   estado: 'pendiente' | 'preparando' | 'listo' | 'entregado';
+  notas?: string;
+  pagado_cantidad?: number;
 }
 
 export interface Pedido {
@@ -44,5 +46,6 @@ export interface Pedido {
   juego_inicio: string | null;
   juego_estado: 'activo' | 'pausado' | null;
   juego_restante_ms: number | null;
+  pagado: number;
   items: PedidoItem[];
 }

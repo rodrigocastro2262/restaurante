@@ -204,6 +204,11 @@ export default function CocinaView() {
                       <span className="font-black text-lg text-indigo-900">{item.cantidad}x</span>
                       <span className="text-gray-800 font-medium leading-tight pt-1">{item.producto_nombre}</span>
                     </div>
+                    {item.notas && (
+                      <div className="text-sm text-indigo-600 bg-indigo-50 p-2 rounded-lg italic border border-indigo-100">
+                        Nota: {item.notas}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -223,6 +228,11 @@ export default function CocinaView() {
                       <span className="font-black text-lg text-gray-900">{item.cantidad}x</span>
                       <span className="text-gray-800 font-medium leading-tight pt-1">{item.producto_nombre}</span>
                     </div>
+                    {item.notas && (
+                      <div className="text-sm text-amber-700 bg-amber-50 p-2 rounded-lg italic border border-amber-200 font-medium">
+                        Nota: {item.notas}
+                      </div>
+                    )}
                     <div className="flex justify-end mt-1">
                       <select 
                         value={item.estado}

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Pedido, Producto, Categoria } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
-import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package, Edit3, Plus, Trash2, CheckCircle2, XCircle } from 'lucide-react';
+import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package, Edit3, Plus, Minus, Trash2, CheckCircle2, XCircle, MessageCircle } from 'lucide-react';
 
 type AdminTab = 'caja' | 'gastos' | 'ventas' | 'productos';
 
@@ -40,6 +40,12 @@ export default function AdminView() {
   const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [selectedPedido, setSelectedPedido] = useState<Pedido | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo');
+  const [montoAPagar, setMontoAPagar] = useState<string>('');
+  const [clientPhone, setClientPhone] = useState<string>('');
+  const [splitMode, setSplitMode] = useState<boolean>(false);
+  const [itemsToPay, setItemsToPay] = useState<Record<number, number>>({});
+  const [itemToCancel, setItemToCancel] = useState<number | null>(null);
+  const [productoToCancel, setProductoToCancel] = useState<number | null>(null);
   
   // Productos state
   const [editingProducto, setEditingProducto] = useState<Producto | null>(null);
@@ -152,16 +158,21 @@ export default function AdminView() {
     fetchData();
   };
 
-  const handleDeleteProducto = async (id: number) => {
-    if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
-      const res = await fetch(`/api/productos/${id}`, { method: 'DELETE' });
-      if (!res.ok) {
-        const data = await res.json();
-        alert(data.error);
-      } else {
-        fetchData();
-      }
+  const handleDeleteProducto = (id: number) => {
+    setProductoToCancel(id);
+  };
+
+  const confirmDeleteProducto = async () => {
+    if (productoToCancel === null) return;
+    
+    const res = await fetch(`/api/productos/${productoToCancel}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json();
+      alert(data.error);
+    } else {
+      fetchData();
     }
+    setProductoToCancel(null);
   };
 
   const toggleProductAvailability = async (producto: Producto) => {
@@ -181,18 +192,128 @@ export default function AdminView() {
     return pedido.items.reduce((sum, item) => sum + (getProductPrice(item.producto_id) * item.cantidad), 0);
   };
 
-  const handlePayment = async () => {
-    if (!selectedPedido) return;
-    
+  useEffect(() => {
+    if (selectedPedido && !splitMode) {
+      const total = calculateTotal(selectedPedido);
+      const restante = total - (selectedPedido.pagado || 0);
+      setMontoAPagar(restante.toString());
+    }
+  }, [selectedPedido, productos, splitMode]);
+
+  useEffect(() => {
+    if (splitMode && selectedPedido) {
+      let sum = 0;
+      Object.entries(itemsToPay).forEach(([id, cantidad]) => {
+        const item = selectedPedido.items.find(i => i.id === parseInt(id));
+        if (item) {
+          sum += getProductPrice(item.producto_id) * (cantidad as number);
+        }
+      });
+      setMontoAPagar(sum.toString());
+    }
+  }, [itemsToPay, splitMode, selectedPedido]);
+
+  const sendWhatsAppReceipt = () => {
+    if (!selectedPedido || !clientPhone) return;
     const total = calculateTotal(selectedPedido);
     
-    await fetch(`/api/pedidos/${selectedPedido.id}/pagar`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ metodo: paymentMethod, monto: total })
+    let text = `🍦 *HELADERÍA ARCOIRIS* 🌈\n`;
+    text += `📍 Carrera 4 #13:24\n`;
+    text += `📄 RUT: 1054921764-4\n`;
+    text += `------------------------\n`;
+    text += `*Detalle de Venta*\n`;
+    text += `Fecha: ${new Date().toLocaleString()}\n`;
+    text += `Mesa: ${selectedPedido.mesa_numero}\n`;
+    text += `------------------------\n`;
+    
+    selectedPedido.items.forEach(item => {
+      const price = getProductPrice(item.producto_id);
+      const subtotal = price * item.cantidad;
+      text += `${item.cantidad}x ${item.producto_nombre} - $${subtotal.toLocaleString()}\n`;
     });
     
-    setSelectedPedido(null);
+    text += `------------------------\n`;
+    text += `*TOTAL: $${total.toLocaleString()}*\n`;
+    if (selectedPedido.pagado > 0) {
+      text += `Abonado: $${selectedPedido.pagado.toLocaleString()}\n`;
+      text += `Restante: $${(total - selectedPedido.pagado).toLocaleString()}\n`;
+    }
+    text += `------------------------\n`;
+    text += `¡Gracias por su compra! 🍧`;
+
+    let phone = clientPhone.replace(/\D/g, '');
+    if (phone.length === 10) {
+      phone = '57' + phone;
+    }
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
+  };
+
+  const handlePayment = async () => {
+    if (!selectedPedido || !montoAPagar) return;
+    
+    const total = calculateTotal(selectedPedido);
+    const monto = parseFloat(montoAPagar);
+    
+    if (isNaN(monto) || monto <= 0) return;
+
+    const restante = total - (selectedPedido.pagado || 0);
+    const cerrarMesa = monto >= restante;
+    
+    if (splitMode) {
+      const itemsToPayArray = Object.entries(itemsToPay)
+        .filter(([_, cantidad]) => (cantidad as number) > 0)
+        .map(([id, cantidad]) => ({ id: parseInt(id), cantidad: cantidad as number }));
+
+      await fetch(`/api/pedidos/${selectedPedido.id}/pagar-items`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metodo: paymentMethod, monto, cerrarMesa, items: itemsToPayArray })
+      });
+    } else {
+      await fetch(`/api/pedidos/${selectedPedido.id}/pagar`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ metodo: paymentMethod, monto, cerrarMesa })
+      });
+    }
+    
+    if (cerrarMesa) {
+      setSelectedPedido(null);
+      setSplitMode(false);
+      setItemsToPay({});
+    } else {
+      fetchData();
+      // Reset split mode state
+      setSplitMode(false);
+      setItemsToPay({});
+      // Update local selected pedido
+      setSelectedPedido({
+        ...selectedPedido,
+        pagado: (selectedPedido.pagado || 0) + monto
+      });
+    }
+  };
+
+  const cancelItem = (itemId: number) => {
+    setItemToCancel(itemId);
+  };
+
+  const confirmCancelItem = async () => {
+    if (itemToCancel === null) return;
+    
+    await fetch(`/api/pedido_items/${itemToCancel}`, { method: 'DELETE' });
+    
+    // Update local state to reflect the change immediately
+    if (selectedPedido) {
+      const updatedItems = selectedPedido.items.filter(item => item.id !== itemToCancel);
+      if (updatedItems.length === 0) {
+        setSelectedPedido(null);
+      } else {
+        setSelectedPedido({ ...selectedPedido, items: updatedItems });
+      }
+    }
+    setItemToCancel(null);
   };
 
   const pauseTimer = async (pedidoId: number) => {
@@ -212,110 +333,281 @@ export default function AdminView() {
 
   if (selectedPedido) {
     return (
-      <div className="p-6 h-full flex flex-col bg-gray-50 max-w-3xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden h-full">
-          <div className="p-4 border-b border-gray-200 bg-gray-900 text-white flex justify-between items-center">
-            <h2 className="text-xl font-bold">Cobrar Mesa {selectedPedido.mesa_numero}</h2>
-            <button onClick={() => setSelectedPedido(null)} className="text-gray-400 hover:text-white">
+      <div className="p-6 h-full flex flex-col bg-gray-50 max-w-4xl mx-auto">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden h-full relative">
+          <div className="p-4 border-b border-gray-200 bg-gray-900 flex justify-between items-center relative z-10">
+            <h2 className="text-xl font-bold text-white">Cobrar Mesa {selectedPedido.mesa_numero}</h2>
+            <button onClick={() => setSelectedPedido(null)} className="p-2 text-gray-400 hover:text-white rounded-full transition-colors">
               <X className="w-6 h-6" />
             </button>
           </div>
           
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="grid grid-cols-2 gap-8">
-              <div>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="font-bold text-gray-700 uppercase text-sm tracking-wider">Detalle del Pedido</h3>
-                  {selectedPedido.juego_minutos && selectedPedido.juego_minutos > 0 ? (
-                    <div className="flex items-center gap-2">
-                      <TimerDisplay 
-                        inicio={selectedPedido.juego_inicio!} 
-                        minutos={selectedPedido.juego_minutos} 
-                        estado={selectedPedido.juego_estado as any}
-                        restanteMs={selectedPedido.juego_restante_ms!}
-                        className="text-sm bg-gray-100 px-2 py-1 rounded-md"
-                      />
-                      {selectedPedido.juego_estado === 'activo' ? (
-                        <button onClick={() => pauseTimer(selectedPedido.id)} className="p-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200" title="Pausar">
-                          <Pause className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <button onClick={() => resumeTimer(selectedPedido.id)} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200" title="Reanudar">
-                          <Play className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-                <div className="space-y-3 mb-6">
-                  {selectedPedido.items.map(item => (
-                    <div key={item.id} className="flex justify-between items-center text-sm border-b border-gray-100 pb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-gray-900">{item.cantidad}x</span>
-                        <span className="text-gray-700">{item.producto_nombre}</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase ${
-                          item.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                          item.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :
-                          item.estado === 'listo' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {item.estado}
-                        </span>
-                        <span className="font-medium text-gray-900 w-16 text-right">
-                          ${(getProductPrice(item.producto_id) * item.cantidad).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
+          <div className="flex-1 overflow-y-auto p-6 relative z-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Factura Ticket */}
+              <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 flex flex-col h-full">
+                <div className="text-center mb-6 border-b border-gray-200/50 pb-4">
+                  <h3 className="font-black text-xl text-gray-800">HELADERÍA ARCOIRIS</h3>
+                  <p className="text-xs text-gray-600 font-medium">Carrera 4 #13:24</p>
+                  <p className="text-xs text-gray-600 font-medium">RUT: 1054921764-4</p>
+                  <p className="text-xs text-gray-500 mt-2">Pedido #{selectedPedido.id}</p>
                 </div>
 
-                <div className="border-t border-gray-200 pt-4 mb-6">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-gray-700">Total a Pagar</span>
-                    <span className="text-3xl font-black text-gray-900">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="font-bold text-gray-700 uppercase text-sm tracking-wider">Detalle del Pedido</h3>
+                  <div className="flex items-center gap-4">
+                    <button
+                      onClick={() => {
+                        setSplitMode(!splitMode);
+                        setItemsToPay({});
+                      }}
+                      className={`text-xs px-3 py-1.5 rounded-full font-bold transition-colors ${
+                        splitMode ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      {splitMode ? 'Cancelar División' : 'Dividir por Productos'}
+                    </button>
+                    {selectedPedido.juego_minutos && selectedPedido.juego_minutos > 0 ? (
+                      <div className="flex items-center gap-2">
+                        <TimerDisplay 
+                          inicio={selectedPedido.juego_inicio!} 
+                          minutos={selectedPedido.juego_minutos} 
+                          estado={selectedPedido.juego_estado as any}
+                          restanteMs={selectedPedido.juego_restante_ms!}
+                          className="text-sm bg-white/50 px-2 py-1 rounded-md shadow-sm"
+                        />
+                        {selectedPedido.juego_estado === 'activo' ? (
+                          <button onClick={() => pauseTimer(selectedPedido.id)} className="p-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 shadow-sm" title="Pausar">
+                            <Pause className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button onClick={() => resumeTimer(selectedPedido.id)} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 shadow-sm" title="Reanudar">
+                            <Play className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+                <div className="space-y-3 mb-6 flex-1">
+                  {selectedPedido.items.map(item => {
+                    const unpaidCantidad = item.cantidad - (item.pagado_cantidad || 0);
+                    const isFullyPaid = unpaidCantidad <= 0;
+                    const selectedToPay = itemsToPay[item.id] || 0;
+
+                    return (
+                      <div key={item.id} className={`flex flex-col gap-1 text-sm border-b border-gray-200/50 pb-2 ${isFullyPaid ? 'opacity-50' : ''}`}>
+                        <div className="flex justify-between items-center">
+                          <div className="flex items-center gap-2">
+                            {splitMode && !isFullyPaid && (
+                              <div className="flex items-center gap-1 bg-gray-100 rounded-lg p-0.5 mr-2">
+                                <button
+                                  onClick={() => setItemsToPay(prev => ({ ...prev, [item.id]: Math.max(0, (prev[item.id] || 0) - 1) }))}
+                                  className="w-6 h-6 flex items-center justify-center bg-white rounded shadow-sm text-gray-600 hover:text-indigo-600"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </button>
+                                <span className="w-4 text-center font-bold text-xs">{selectedToPay}</span>
+                                <button
+                                  onClick={() => setItemsToPay(prev => ({ ...prev, [item.id]: Math.min(unpaidCantidad, (prev[item.id] || 0) + 1) }))}
+                                  className="w-6 h-6 flex items-center justify-center bg-white rounded shadow-sm text-gray-600 hover:text-indigo-600"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                            <span className="font-bold text-gray-900">{item.cantidad}x</span>
+                            <span className="text-gray-800 font-medium">{item.producto_nombre}</span>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            {item.pagado_cantidad && item.pagado_cantidad > 0 ? (
+                              <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase bg-green-100 text-green-800">
+                                {item.pagado_cantidad}/{item.cantidad} Pagado
+                              </span>
+                            ) : (
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase shadow-sm ${
+                                item.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                                item.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :
+                                item.estado === 'listo' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {item.estado}
+                              </span>
+                            )}
+                            <span className="font-bold text-gray-900 w-16 text-right">
+                              ${(getProductPrice(item.producto_id) * item.cantidad).toLocaleString()}
+                            </span>
+                            {!isFullyPaid && !splitMode && (
+                              <button
+                                onClick={() => cancelItem(item.id)}
+                                className="p-1 text-red-500 hover:bg-red-100 rounded-lg transition-colors"
+                                title="Cancelar producto"
+                              >
+                                <X className="w-4 h-4" />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        {item.notas && (
+                          <div className="text-xs text-gray-600 italic ml-6">
+                            Nota: {item.notas}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="border-t-2 border-dashed border-gray-300 pt-4 mt-auto">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-lg font-bold text-gray-700">Total del Pedido</span>
+                    <span className="text-xl font-black text-gray-900">
                       ${calculateTotal(selectedPedido).toLocaleString()}
+                    </span>
+                  </div>
+                  {selectedPedido.pagado > 0 && (
+                    <div className="flex justify-between items-center mb-2 text-green-600">
+                      <span className="text-md font-bold">Abonado</span>
+                      <span className="text-lg font-bold">
+                        -${selectedPedido.pagado.toLocaleString()}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t border-gray-200/50">
+                    <span className="text-xl font-black text-gray-800">Restante</span>
+                    <span className="text-3xl font-black text-indigo-600 drop-shadow-sm">
+                      ${(calculateTotal(selectedPedido) - (selectedPedido.pagado || 0)).toLocaleString()}
                     </span>
                   </div>
                 </div>
               </div>
 
-              <div>
-                <h3 className="font-bold text-gray-700 mb-4 uppercase text-sm tracking-wider">Método de Pago</h3>
-                <div className="grid grid-cols-1 gap-3 mb-6">
-                  {paymentMethods.map(method => {
-                    const Icon = method.icon;
-                    return (
-                      <button
-                        key={method.id}
-                        onClick={() => setPaymentMethod(method.id)}
-                        className={`p-4 rounded-xl border flex items-center gap-4 transition-colors ${
-                          paymentMethod === method.id 
-                            ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold ring-2 ring-indigo-200' 
-                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                        }`}
+              {/* Payment Controls */}
+              <div className="flex flex-col">
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200 mb-6">
+                  <h3 className="font-bold text-gray-800 mb-4 uppercase text-sm tracking-wider">Método de Pago</h3>
+                  <div className="grid grid-cols-2 gap-3 mb-6">
+                    {paymentMethods.map(method => {
+                      const Icon = method.icon;
+                      return (
+                        <button
+                          key={method.id}
+                          onClick={() => setPaymentMethod(method.id)}
+                          className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors shadow-sm ${
+                            paymentMethod === method.id 
+                              ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold ring-2 ring-indigo-200' 
+                              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                          }`}
+                        >
+                          <Icon className="w-6 h-6" />
+                          <span className="text-sm text-center">{method.id}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  <h3 className="font-bold text-gray-800 mb-4 uppercase text-sm tracking-wider">Monto a Pagar</h3>
+                  <div className="relative shadow-sm rounded-xl">
+                    <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                      <DollarSign className="h-6 w-6 text-gray-400" />
+                    </div>
+                    <input
+                      type="number"
+                      value={montoAPagar}
+                      onChange={(e) => setMontoAPagar(e.target.value)}
+                      readOnly={splitMode}
+                      className={`block w-full pl-12 pr-4 py-4 text-2xl font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 ${splitMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                      max={calculateTotal(selectedPedido) - (selectedPedido.pagado || 0)}
+                    />
+                  </div>
+                  {!splitMode && (
+                    <div className="mt-3 flex gap-2">
+                      <button 
+                        onClick={() => setMontoAPagar(((calculateTotal(selectedPedido) - (selectedPedido.pagado || 0)) / 2).toString())}
+                        className="flex-1 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg font-bold text-sm transition-colors shadow-sm"
                       >
-                        <Icon className="w-6 h-6" />
-                        <span className="text-lg">{method.id}</span>
+                        Mitad (50%)
                       </button>
-                    );
-                  })}
+                      <button 
+                        onClick={() => setMontoAPagar((calculateTotal(selectedPedido) - (selectedPedido.pagado || 0)).toString())}
+                        className="flex-1 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg font-bold text-sm transition-colors shadow-sm"
+                      >
+                        Total
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-200">
+                  <h3 className="font-bold text-gray-800 mb-4 uppercase text-sm tracking-wider">Enviar Recibo (WhatsApp)</h3>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1 shadow-sm rounded-xl">
+                      <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-bold">+57</span>
+                      <input
+                        type="tel"
+                        value={clientPhone}
+                        onChange={(e) => setClientPhone(e.target.value)}
+                        placeholder="Número del cliente"
+                        className="block w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                    <button
+                      onClick={sendWhatsAppReceipt}
+                      disabled={!clientPhone || clientPhone.length < 10}
+                      className="px-4 py-3 bg-[#25D366] hover:bg-[#128C7E] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md transition-colors flex items-center gap-2"
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <div className="p-6 border-t border-gray-200 bg-gray-50">
+          <div className="p-6 border-t border-gray-200 bg-gray-50 relative z-10">
             <button
               onClick={handlePayment}
-              className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xl shadow-md transition-colors flex items-center justify-center gap-2"
+              disabled={!montoAPagar || parseFloat(montoAPagar) <= 0}
+              className="w-full py-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white rounded-xl font-black text-xl shadow-lg transition-colors flex items-center justify-center gap-2"
             >
               <CreditCard className="w-6 h-6" />
-              Confirmar Pago y Liberar Mesa
+              {splitMode 
+                ? 'Pagar Productos Seleccionados'
+                : parseFloat(montoAPagar) >= (calculateTotal(selectedPedido) - (selectedPedido.pagado || 0)) 
+                  ? 'Confirmar Pago y Liberar Mesa' 
+                  : 'Registrar Pago Parcial'}
             </button>
           </div>
         </div>
+
+        {/* Confirmation Modal for Item Cancellation */}
+        {itemToCancel !== null && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+              <h3 className="text-lg font-bold text-gray-900 mb-2">¿Cancelar Producto?</h3>
+              <p className="text-gray-600 mb-6">
+                ¿Estás seguro de que deseas eliminar este producto del pedido? Esta acción no se puede deshacer.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setItemToCancel(null)}
+                  className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+                >
+                  Volver
+                </button>
+                <button
+                  onClick={confirmCancelItem}
+                  className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors"
+                >
+                  Sí, cancelar producto
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -429,6 +721,11 @@ export default function AdminView() {
                         className="mt-1 text-xs bg-white/80 px-2 py-1 rounded-full shadow-sm"
                       />
                     ) : null}
+                    {pedido.pagado > 0 && (
+                      <div className="absolute -bottom-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full border-2 border-white shadow-sm">
+                        Abonado
+                      </div>
+                    )}
                   </button>
                 ))}
               </div>
@@ -771,6 +1068,32 @@ export default function AdminView() {
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal for Producto Deletion */}
+      {productoToCancel !== null && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl">
+            <h3 className="text-lg font-bold text-gray-900 mb-2">¿Eliminar Producto?</h3>
+            <p className="text-gray-600 mb-6">
+              ¿Estás seguro de que deseas eliminar este producto? Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setProductoToCancel(null)}
+                className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg font-medium transition-colors"
+              >
+                Volver
+              </button>
+              <button
+                onClick={confirmDeleteProducto}
+                className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg font-medium transition-colors"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

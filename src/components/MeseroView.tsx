@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Mesa, Categoria, Producto, Pedido, Sabor } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
-import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search } from 'lucide-react';
+import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search, MessageCircle } from 'lucide-react';
 
 export default function MeseroView() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
@@ -12,10 +12,11 @@ export default function MeseroView() {
   const [selectedMesa, setSelectedMesa] = useState<Mesa | null>(null);
   const [selectedCategoria, setSelectedCategoria] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [cart, setCart] = useState<{ producto: Producto; cantidad: number }[]>([]);
+  const [cart, setCart] = useState<{ id: string; producto: Producto; cantidad: number; notas: string; sabores?: string[] }[]>([]);
   const [pedidosActivos, setPedidosActivos] = useState<Pedido[]>([]);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo');
+  const [clientPhone, setClientPhone] = useState<string>('');
 
   const paymentMethods = [
     { id: 'Efectivo', icon: DollarSign },
@@ -62,19 +63,19 @@ export default function MeseroView() {
     }
   };
 
-  const addToCart = (producto: Producto) => {
+  const addToCart = (producto: Producto, notas: string = '') => {
     setCart(prev => {
-      const existing = prev.find(item => item.producto.id === producto.id);
+      const existing = prev.find(item => item.producto.id === producto.id && item.notas === notas && (!item.sabores || item.sabores.length === 0));
       if (existing) {
-        return prev.map(item => item.producto.id === producto.id ? { ...item, cantidad: item.cantidad + 1 } : item);
+        return prev.map(item => item.id === existing.id ? { ...item, cantidad: item.cantidad + 1 } : item);
       }
-      return [...prev, { producto, cantidad: 1 }];
+      return [...prev, { id: Math.random().toString(36).substring(7), producto, cantidad: 1, notas, sabores: ['', '', ''] }];
     });
   };
 
-  const updateQuantity = (productoId: number, delta: number) => {
+  const updateQuantity = (cartItemId: string, delta: number) => {
     setCart(prev => prev.map(item => {
-      if (item.producto.id === productoId) {
+      if (item.id === cartItemId) {
         const newCantidad = item.cantidad + delta;
         return newCantidad > 0 ? { ...item, cantidad: newCantidad } : item;
       }
@@ -82,8 +83,23 @@ export default function MeseroView() {
     }).filter(item => item.cantidad > 0));
   };
 
-  const removeFromCart = (productoId: number) => {
-    setCart(prev => prev.filter(item => item.producto.id !== productoId));
+  const updateNotas = (cartItemId: string, notas: string) => {
+    setCart(prev => prev.map(item => item.id === cartItemId ? { ...item, notas } : item));
+  };
+
+  const updateSabor = (cartItemId: string, index: number, sabor: string) => {
+    setCart(prev => prev.map(item => {
+      if (item.id === cartItemId) {
+        const newSabores = [...(item.sabores || ['', '', ''])];
+        newSabores[index] = sabor;
+        return { ...item, sabores: newSabores };
+      }
+      return item;
+    }));
+  };
+
+  const removeFromCart = (cartItemId: string) => {
+    setCart(prev => prev.filter(item => item.id !== cartItemId));
   };
 
   // Sync draft order to server
@@ -94,11 +110,16 @@ export default function MeseroView() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           mesa_id: selectedMesa.id,
-          items: cart.map(item => ({ 
-            producto_id: item.producto.id, 
-            producto_nombre: item.producto.nombre,
-            cantidad: item.cantidad 
-          }))
+          items: cart.map(item => {
+            const selectedSabores = item.sabores?.filter(s => s).join(', ');
+            const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
+            return { 
+              producto_id: item.producto.id, 
+              producto_nombre: item.producto.nombre,
+              cantidad: item.cantidad,
+              notas: finalNotas
+            };
+          })
         })
       }).catch(console.error);
     }
@@ -117,12 +138,47 @@ export default function MeseroView() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         mesa_id: selectedMesa.id,
-        items: cart.map(item => ({ producto_id: item.producto.id, cantidad: item.cantidad }))
+        items: cart.map(item => {
+          const selectedSabores = item.sabores?.filter(s => s).join(', ');
+          const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
+          return { producto_id: item.producto.id, cantidad: item.cantidad, notas: finalNotas };
+        })
       })
     });
     
     setCart([]);
     setSelectedMesa(null);
+  };
+
+  const sendWhatsAppReceipt = () => {
+    if (!clientPhone) return;
+    const totalCart = cart.reduce((sum, item) => sum + (item.producto.precio * item.cantidad), 0);
+    
+    let text = `🍦 *HELADERÍA ARCOIRIS* 🌈\n`;
+    text += `📍 Carrera 4 #13:24\n`;
+    text += `📄 RUT: 1054921764-4\n`;
+    text += `------------------------\n`;
+    text += `*Detalle de Venta*\n`;
+    text += `Fecha: ${new Date().toLocaleString()}\n`;
+    text += `Mesa: ${selectedMesa?.nombre || 'Mostrador'}\n`;
+    text += `------------------------\n`;
+    
+    cart.forEach(item => {
+      const subtotal = item.producto.precio * item.cantidad;
+      text += `${item.cantidad}x ${item.producto.nombre} - $${subtotal.toLocaleString()}\n`;
+    });
+    
+    text += `------------------------\n`;
+    text += `*TOTAL: $${totalCart.toLocaleString()}*\n`;
+    text += `------------------------\n`;
+    text += `¡Gracias por su compra! 🍧`;
+
+    let phone = clientPhone.replace(/\D/g, '');
+    if (phone.length === 10) {
+      phone = '57' + phone;
+    }
+
+    window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
   const processDirectPayment = async () => {
@@ -134,7 +190,11 @@ export default function MeseroView() {
       body: JSON.stringify({
         mesa_id: selectedMesa.id,
         metodo: paymentMethod,
-        items: cart.map(item => ({ producto_id: item.producto.id, cantidad: item.cantidad }))
+        items: cart.map(item => {
+          const selectedSabores = item.sabores?.filter(s => s).join(', ');
+          const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
+          return { producto_id: item.producto.id, cantidad: item.cantidad, notas: finalNotas };
+        })
       })
     });
     
@@ -359,18 +419,25 @@ export default function MeseroView() {
                 </div>
                 <div className="space-y-3">
                   {pedidoActual.items.map(item => (
-                    <div key={item.id} className="flex justify-between items-center text-sm">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium text-gray-900">{item.cantidad}x</span>
-                        <span className="text-gray-700">{item.producto_nombre}</span>
+                    <div key={item.id} className="flex flex-col gap-1 text-sm border-b border-gray-50 pb-2">
+                      <div className="flex justify-between items-center">
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium text-gray-900">{item.cantidad}x</span>
+                          <span className="text-gray-700">{item.producto_nombre}</span>
+                        </div>
+                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
+                          item.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
+                          item.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :
+                          'bg-green-100 text-green-800'
+                        }`}>
+                          {item.estado}
+                        </span>
                       </div>
-                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                        item.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                        item.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :
-                        'bg-green-100 text-green-800'
-                      }`}>
-                        {item.estado}
-                      </span>
+                      {item.notas && (
+                        <div className="text-xs text-gray-500 italic ml-6">
+                          Nota: {item.notas}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>
@@ -384,18 +451,45 @@ export default function MeseroView() {
                 <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Nuevo Pedido</h4>
                 <div className="space-y-4">
                   {cart.map(item => (
-                    <div key={item.producto.id} className="flex flex-col gap-2">
+                    <div key={item.id} className="flex flex-col gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
                       <div className="flex justify-between">
                         <span className="font-medium text-gray-900">{item.producto.nombre}</span>
                         <span className="font-semibold text-gray-900">${(item.producto.precio * item.cantidad).toLocaleString()}</span>
                       </div>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 bg-gray-100 rounded-lg p-1">
-                          <button onClick={() => updateQuantity(item.producto.id, -1)} className="p-1 bg-white rounded shadow-sm hover:bg-gray-50"><Minus className="w-4 h-4" /></button>
-                          <span className="font-medium w-4 text-center">{item.cantidad}</span>
-                          <button onClick={() => updateQuantity(item.producto.id, 1)} className="p-1 bg-white rounded shadow-sm hover:bg-gray-50"><Plus className="w-4 h-4" /></button>
+                      
+                      {item.producto.categoria_id === 1 && (
+                        <div className="flex gap-1 mt-1">
+                          {[0, 1, 2].map(idx => (
+                            <select
+                              key={idx}
+                              value={item.sabores?.[idx] || ''}
+                              onChange={(e) => updateSabor(item.id, idx, e.target.value)}
+                              className="w-1/3 text-[10px] p-1 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                            >
+                              <option value="">Sabor {idx + 1}</option>
+                              {sabores.filter(s => s.tipo === 'helado' && s.disponible).map(s => (
+                                <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                              ))}
+                            </select>
+                          ))}
                         </div>
-                        <button onClick={() => removeFromCart(item.producto.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-lg">
+                      )}
+
+                      <input
+                        type="text"
+                        placeholder="Especificaciones (ej. sin salsa...)"
+                        value={item.notas}
+                        onChange={(e) => updateNotas(item.id, e.target.value)}
+                        className="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                      />
+
+                      <div className="flex items-center justify-between mt-1">
+                        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-1">
+                          <button onClick={() => updateQuantity(item.id, -1)} className="p-1 bg-gray-50 rounded hover:bg-gray-100"><Minus className="w-3 h-3" /></button>
+                          <span className="font-medium w-4 text-center text-sm">{item.cantidad}</span>
+                          <button onClick={() => updateQuantity(item.id, 1)} className="p-1 bg-gray-50 rounded hover:bg-gray-100"><Plus className="w-3 h-3" /></button>
+                        </div>
+                        <button onClick={() => removeFromCart(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </div>
@@ -463,26 +557,49 @@ export default function MeseroView() {
                   </span>
                 </div>
               </div>
+
               <h3 className="font-bold text-gray-700 mb-3 uppercase text-sm tracking-wider">Método de Pago</h3>
               <div className="grid grid-cols-2 gap-3 mb-6">
-                {paymentMethods.map(method => {
-                  const Icon = method.icon;
-                  return (
-                    <button
-                      key={method.id}
-                      onClick={() => setPaymentMethod(method.id)}
-                      className={`p-3 rounded-lg border flex flex-col items-center justify-center gap-2 transition-colors ${
-                        paymentMethod === method.id 
-                          ? 'bg-green-50 border-green-500 text-green-700 font-bold' 
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      <Icon className="w-6 h-6" />
-                      <span className="text-sm text-center">{method.id}</span>
-                    </button>
-                  );
-                })}
+                  {paymentMethods.map(method => {
+                    const Icon = method.icon;
+                    return (
+                      <button
+                        key={method.id}
+                        onClick={() => setPaymentMethod(method.id)}
+                        className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors shadow-sm ${
+                          paymentMethod === method.id 
+                            ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold ring-2 ring-indigo-200' 
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        <Icon className="w-6 h-6" />
+                        <span className="text-sm text-center">{method.id}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+              <h3 className="font-bold text-gray-700 mb-3 uppercase text-sm tracking-wider mt-4">Enviar Recibo (WhatsApp)</h3>
+              <div className="flex gap-2 mb-6">
+                <div className="relative flex-1">
+                  <span className="absolute inset-y-0 left-0 pl-3 flex items-center text-gray-500 font-bold">+57</span>
+                  <input
+                    type="tel"
+                    value={clientPhone}
+                    onChange={(e) => setClientPhone(e.target.value)}
+                    placeholder="Número del cliente"
+                    className="block w-full pl-12 pr-4 py-3 bg-white border-2 border-gray-200 rounded-xl focus:ring-green-500 focus:border-green-500"
+                  />
+                </div>
+                <button
+                  onClick={sendWhatsAppReceipt}
+                  disabled={!clientPhone || clientPhone.length < 10}
+                  className="px-4 py-3 bg-[#25D366] hover:bg-[#128C7E] disabled:bg-gray-300 disabled:cursor-not-allowed text-white rounded-xl font-bold shadow-md transition-colors flex items-center gap-2"
+                >
+                  <MessageCircle className="w-5 h-5" />
+                </button>
               </div>
+
               <button
                 onClick={processDirectPayment}
                 className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-lg shadow-md transition-colors flex items-center justify-center gap-2"

@@ -98,6 +98,14 @@ try {
   db.exec("ALTER TABLE sabores ADD COLUMN tipo VARCHAR(50) DEFAULT 'helado'");
 } catch (e) {}
 
+try {
+  db.exec("ALTER TABLE pedido_items ADD COLUMN notas VARCHAR(255)");
+} catch (e) {}
+
+try {
+  db.exec("ALTER TABLE pedido_items ADD COLUMN pagado_cantidad INT DEFAULT 0");
+} catch (e) {}
+
 // Seed Data
 const opciones = [
   { tipo: 'helado', nombre: 'Fresa' },
@@ -308,7 +316,8 @@ async function startServer() {
   // Get active orders (for KDS and Admin)
   app.get('/api/pedidos/activos', (req, res) => {
     const pedidos = db.prepare(`
-      SELECT p.id, p.mesa_id, m.nombre as mesa_numero, p.estado, p.creado_en, p.juego_minutos, p.juego_inicio, p.juego_estado, p.juego_restante_ms
+      SELECT p.id, p.mesa_id, m.nombre as mesa_numero, p.estado, p.creado_en, p.juego_minutos, p.juego_inicio, p.juego_estado, p.juego_restante_ms,
+             COALESCE((SELECT SUM(monto) FROM pagos WHERE pedido_id = p.id), 0) as pagado
       FROM pedidos p
       JOIN mesas m ON p.mesa_id = m.id
       WHERE p.estado = 'abierto'
@@ -316,7 +325,7 @@ async function startServer() {
     `).all();
 
     const itemsStmt = db.prepare(`
-      SELECT pi.id, pi.pedido_id, pi.producto_id, pr.nombre as producto_nombre, pi.cantidad, pi.estado
+      SELECT pi.id, pi.pedido_id, pi.producto_id, pr.nombre as producto_nombre, pi.cantidad, pi.estado, pi.notas, pi.pagado_cantidad
       FROM pedido_items pi
       JOIN productos pr ON pi.producto_id = pr.id
       WHERE pi.pedido_id = ?
@@ -340,9 +349,9 @@ async function startServer() {
       const pedidoId = result.lastInsertRowid;
       
       let total = 0;
-      const insertItem = db.prepare("INSERT INTO pedido_items (pedido_id, producto_id, cantidad, estado) VALUES (?, ?, ?, 'entregado')");
+      const insertItem = db.prepare("INSERT INTO pedido_items (pedido_id, producto_id, cantidad, estado, notas) VALUES (?, ?, ?, 'entregado', ?)");
       for (const item of items) {
-        insertItem.run(pedidoId, item.producto_id, item.cantidad);
+        insertItem.run(pedidoId, item.producto_id, item.cantidad, item.notas || null);
         const prod = db.prepare("SELECT precio FROM productos WHERE id = ?").get(item.producto_id) as any;
         total += (prod.precio * item.cantidad);
       }
@@ -378,9 +387,9 @@ async function startServer() {
         db.prepare("DELETE FROM pedido_items WHERE pedido_id = ? AND producto_id IN (67, 68, 69, 70)").run(pedido.id);
       }
 
-      const insertItem = db.prepare("INSERT INTO pedido_items (pedido_id, producto_id, cantidad) VALUES (?, ?, ?)");
+      const insertItem = db.prepare("INSERT INTO pedido_items (pedido_id, producto_id, cantidad, notas) VALUES (?, ?, ?, ?)");
       for (const item of items) {
-        insertItem.run(pedido.id, item.producto_id, item.cantidad);
+        insertItem.run(pedido.id, item.producto_id, item.cantidad, item.notas || null);
       }
 
       // If it's an existing order with an active timer, and we're adding new non-game items, restart the timer
@@ -470,17 +479,55 @@ async function startServer() {
     res.json({ success: true });
   });
 
+  // Delete item from order
+  app.delete('/api/pedido_items/:id', (req, res) => {
+    const { id } = req.params;
+    db.prepare("DELETE FROM pedido_items WHERE id = ?").run(id);
+    events.emit('update');
+    res.json({ success: true });
+  });
+
   // Close table and pay
   app.post('/api/pedidos/:id/pagar', (req, res) => {
     const { id } = req.params;
-    const { metodo, monto } = req.body;
+    const { metodo, monto, cerrarMesa } = req.body;
 
     const transaction = db.transaction(() => {
       const pedido = db.prepare("SELECT mesa_id FROM pedidos WHERE id = ?").get(id) as any;
       if (pedido) {
         db.prepare("INSERT INTO pagos (pedido_id, metodo, monto) VALUES (?, ?, ?)").run(id, metodo, monto);
-        db.prepare("UPDATE pedidos SET estado = 'pagado' WHERE id = ?").run(id);
-        db.prepare("UPDATE mesas SET estado = 'disponible' WHERE id = ?").run(pedido.mesa_id);
+        
+        if (cerrarMesa) {
+          db.prepare("UPDATE pedidos SET estado = 'pagado' WHERE id = ?").run(id);
+          db.prepare("UPDATE mesas SET estado = 'disponible' WHERE id = ?").run(pedido.mesa_id);
+        }
+      }
+    });
+
+    transaction();
+    events.emit('update');
+    res.json({ success: true });
+  });
+
+  app.post('/api/pedidos/:id/pagar-items', (req, res) => {
+    const { id } = req.params;
+    const { metodo, monto, cerrarMesa, items } = req.body;
+
+    const transaction = db.transaction(() => {
+      const pedido = db.prepare("SELECT mesa_id FROM pedidos WHERE id = ?").get(id) as any;
+      if (pedido) {
+        db.prepare("INSERT INTO pagos (pedido_id, metodo, monto) VALUES (?, ?, ?)").run(id, metodo, monto);
+        
+        // Update pagado_cantidad for each item
+        const updateItem = db.prepare("UPDATE pedido_items SET pagado_cantidad = pagado_cantidad + ? WHERE id = ?");
+        for (const item of items) {
+          updateItem.run(item.cantidad, item.id);
+        }
+
+        if (cerrarMesa) {
+          db.prepare("UPDATE pedidos SET estado = 'pagado' WHERE id = ?").run(id);
+          db.prepare("UPDATE mesas SET estado = 'disponible' WHERE id = ?").run(pedido.mesa_id);
+        }
       }
     });
 
