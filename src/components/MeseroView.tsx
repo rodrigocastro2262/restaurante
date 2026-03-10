@@ -246,9 +246,9 @@ export default function MeseroView() {
 
     return (
       <>
-        <div className="flex h-full bg-gray-50">
+        <div className="flex flex-col lg:flex-row h-full bg-gray-50">
           {/* Left Panel - Menu */}
-          <div className="flex-1 flex flex-col overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden min-h-[50vh] lg:min-h-0">
             <div className="bg-white p-4 shadow-sm flex items-center gap-4">
               <button onClick={handleBack} className="p-2 hover:bg-gray-100 rounded-full">
                 <ArrowLeft className="w-6 h-6" />
@@ -385,7 +385,7 @@ export default function MeseroView() {
         </div>
 
         {/* Right Panel - Cart & Current Order */}
-        <div className="w-96 bg-white border-l border-gray-200 flex flex-col">
+        <div className="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-1 lg:flex-none min-h-[50vh] lg:min-h-0">
           <div className="p-4 border-b border-gray-200 bg-gray-50">
             <h3 className="text-lg font-bold">Pedido Actual</h3>
           </div>
