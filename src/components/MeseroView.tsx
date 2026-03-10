@@ -3,6 +3,19 @@ import { Mesa, Categoria, Producto, Pedido, Sabor } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
 import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search, MessageCircle } from 'lucide-react';
+import { 
+  subscribeToMesas, 
+  subscribeToCategorias, 
+  subscribeToProductos, 
+  subscribeToPedidosActivos, 
+  subscribeToSabores,
+  saveDraftOrder,
+  submitOrder,
+  processDirectPayment,
+  pauseTimer,
+  resumeTimer,
+  toggleSabor
+} from '../services/db';
 
 export default function MeseroView() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
@@ -25,31 +38,21 @@ export default function MeseroView() {
     { id: 'Daviplata', icon: Wallet },
   ];
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [mesasRes, catRes, prodRes, pedidosRes, saboresRes] = await Promise.all([
-        fetch('/api/mesas'),
-        fetch('/api/categorias'),
-        fetch('/api/productos'),
-        fetch('/api/pedidos/activos'),
-        fetch('/api/sabores')
-      ]);
-      
-      if (mesasRes.ok) setMesas(await mesasRes.json());
-      if (catRes.ok) setCategorias(await catRes.json());
-      if (prodRes.ok) setProductos(await prodRes.json());
-      if (pedidosRes.ok) setPedidosActivos(await pedidosRes.json());
-      if (saboresRes.ok) setSabores(await saboresRes.json());
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    const unsubMesas = subscribeToMesas(setMesas);
+    const unsubCat = subscribeToCategorias(setCategorias);
+    const unsubProd = subscribeToProductos(setProductos);
+    const unsubPedidos = subscribeToPedidosActivos(setPedidosActivos);
+    const unsubSabores = subscribeToSabores(setSabores);
 
-  useSSE('/api/events', fetchData);
+    return () => {
+      unsubMesas();
+      unsubCat();
+      unsubProd();
+      unsubPedidos();
+      unsubSabores();
+    };
+  }, []);
 
   const getIconForCategory = (name: string) => {
     switch (name) {
@@ -105,27 +108,21 @@ export default function MeseroView() {
   // Sync draft order to server
   useEffect(() => {
     if (selectedMesa) {
-      fetch('/api/pedidos/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          mesa_id: selectedMesa.id,
-          items: cart.map(item => {
-            const selectedSabores = item.sabores?.filter(s => s).join(', ');
-            const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
-            return { 
-              producto_id: item.producto.id, 
-              producto_nombre: item.producto.nombre,
-              cantidad: item.cantidad,
-              notas: finalNotas
-            };
-          })
-        })
-      }).catch(console.error);
+      const items = cart.map(item => {
+        const selectedSabores = item.sabores?.filter(s => s).join(', ');
+        const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
+        return { 
+          producto_id: item.producto.id, 
+          producto_nombre: item.producto.nombre,
+          cantidad: item.cantidad,
+          notas: finalNotas
+        };
+      });
+      saveDraftOrder(selectedMesa.id, items).catch(console.error);
     }
   }, [cart, selectedMesa]);
 
-  const submitOrder = async () => {
+  const handleSubmitOrder = async () => {
     if (!selectedMesa || cart.length === 0) return;
     
     if (selectedMesa.id === 1) {
@@ -133,18 +130,13 @@ export default function MeseroView() {
       return;
     }
 
-    await fetch('/api/pedidos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mesa_id: selectedMesa.id,
-        items: cart.map(item => {
-          const selectedSabores = item.sabores?.filter(s => s).join(', ');
-          const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
-          return { producto_id: item.producto.id, cantidad: item.cantidad, notas: finalNotas };
-        })
-      })
+    const items = cart.map(item => {
+      const selectedSabores = item.sabores?.filter(s => s).join(', ');
+      const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
+      return { producto_id: item.producto.id, producto_nombre: item.producto.nombre, cantidad: item.cantidad, notas: finalNotas };
     });
+
+    await submitOrder(selectedMesa.id, items, selectedMesa.nombre);
     
     setCart([]);
     setSelectedMesa(null);
@@ -181,34 +173,28 @@ export default function MeseroView() {
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(text)}`, '_blank');
   };
 
-  const processDirectPayment = async () => {
+  const handleProcessDirectPayment = async () => {
     if (!selectedMesa || cart.length === 0) return;
 
-    await fetch('/api/pedidos/pago-directo', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        mesa_id: selectedMesa.id,
-        metodo: paymentMethod,
-        items: cart.map(item => {
-          const selectedSabores = item.sabores?.filter(s => s).join(', ');
-          const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
-          return { producto_id: item.producto.id, cantidad: item.cantidad, notas: finalNotas };
-        })
-      })
+    const items = cart.map(item => {
+      const selectedSabores = item.sabores?.filter(s => s).join(', ');
+      const finalNotas = [selectedSabores, item.notas].filter(n => n).join(' | ');
+      return { producto_id: item.producto.id, producto_nombre: item.producto.nombre, cantidad: item.cantidad, notas: finalNotas };
     });
+
+    await processDirectPayment(selectedMesa.id, items, paymentMethod, selectedMesa.nombre);
     
     setCart([]);
     setSelectedMesa(null);
     setShowPaymentModal(false);
   };
 
-  const pauseTimer = async (pedidoId: number) => {
-    await fetch(`/api/pedidos/${pedidoId}/pausar`, { method: 'POST' });
+  const handlePauseTimer = async (pedidoId: number) => {
+    await pauseTimer(pedidoId);
   };
 
-  const resumeTimer = async (pedidoId: number) => {
-    await fetch(`/api/pedidos/${pedidoId}/reanudar`, { method: 'POST' });
+  const handleResumeTimer = async (pedidoId: number) => {
+    await resumeTimer(pedidoId);
   };
 
   const getPedidoForMesa = (mesaId: number) => {
@@ -217,19 +203,14 @@ export default function MeseroView() {
 
   const handleBack = () => {
     if (selectedMesa && cart.length > 0) {
-      fetch('/api/pedidos/draft', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ mesa_id: selectedMesa.id, items: [] })
-      }).catch(console.error);
+      saveDraftOrder(selectedMesa.id, []).catch(console.error);
     }
     setSelectedMesa(null);
     setCart([]);
   };
 
-  const toggleSabor = async (id: number) => {
-    await fetch(`/api/sabores/${id}/toggle`, { method: 'PUT' });
-    fetchData();
+  const handleToggleSabor = async (id: number, currentState: boolean) => {
+    await toggleSabor(id, currentState);
   };
 
   if (selectedMesa) {
@@ -287,7 +268,7 @@ export default function MeseroView() {
                   {sabores.filter(s => s.tipo === 'helado').map(sabor => (
                     <button
                       key={sabor.id}
-                      onClick={() => toggleSabor(sabor.id)}
+                      onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
                       className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
                         sabor.disponible 
                           ? 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100' 
@@ -310,7 +291,7 @@ export default function MeseroView() {
                   {sabores.filter(s => s.tipo === 'jugo').map(sabor => (
                     <button
                       key={sabor.id}
-                      onClick={() => toggleSabor(sabor.id)}
+                      onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
                       className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
                         sabor.disponible 
                           ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' 
@@ -333,7 +314,7 @@ export default function MeseroView() {
                   {sabores.filter(s => s.tipo === 'aromatica').map(sabor => (
                     <button
                       key={sabor.id}
-                      onClick={() => toggleSabor(sabor.id)}
+                      onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
                       className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
                         sabor.disponible 
                           ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
@@ -406,11 +387,11 @@ export default function MeseroView() {
                         className="text-sm bg-gray-100 px-2 py-1 rounded-md"
                       />
                       {pedidoActual.juego_estado === 'activo' ? (
-                        <button onClick={() => pauseTimer(pedidoActual.id)} className="p-1.5 bg-amber-100 text-amber-700 rounded hover:bg-amber-200" title="Pausar">
+                        <button onClick={() => handlePauseTimer(pedidoActual.id)} className="p-1.5 bg-amber-100 text-amber-700 rounded hover:bg-amber-200" title="Pausar">
                           <Pause className="w-4 h-4" />
                         </button>
                       ) : (
-                        <button onClick={() => resumeTimer(pedidoActual.id)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200" title="Reanudar">
+                        <button onClick={() => handleResumeTimer(pedidoActual.id)} className="p-1.5 bg-green-100 text-green-700 rounded hover:bg-green-200" title="Reanudar">
                           <Play className="w-4 h-4" />
                         </button>
                       )}
@@ -514,7 +495,7 @@ export default function MeseroView() {
                 <span className="text-2xl font-bold text-gray-900">${totalCart.toLocaleString()}</span>
               </div>
               <button
-                onClick={submitOrder}
+                onClick={handleSubmitOrder}
                 className={`w-full py-3 rounded-xl font-bold text-lg shadow-md transition-colors flex items-center justify-center gap-2 ${
                   selectedMesa.id === 1 
                     ? 'bg-green-600 hover:bg-green-700 text-white'
@@ -601,7 +582,7 @@ export default function MeseroView() {
               </div>
 
               <button
-                onClick={processDirectPayment}
+                onClick={handleProcessDirectPayment}
                 className="w-full py-4 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-lg shadow-md transition-colors flex items-center justify-center gap-2"
               >
                 <Check className="w-6 h-6" />

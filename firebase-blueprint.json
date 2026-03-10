@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "Mesa": {
+      "title": "Mesa",
+      "description": "Una mesa en el restaurante",
+      "type": "object",
+      "properties": {
+        "numero": { "type": "number" },
+        "nombre": { "type": "string" },
+        "estado": { "type": "string", "enum": ["disponible", "ocupada"] }
+      },
+      "required": ["numero", "nombre", "estado"]
+    },
+    "Categoria": {
+      "title": "Categoria",
+      "description": "Categoría de productos",
+      "type": "object",
+      "properties": {
+        "id": { "type": "number" },
+        "nombre": { "type": "string" }
+      },
+      "required": ["id", "nombre"]
+    },
+    "Producto": {
+      "title": "Producto",
+      "description": "Producto del menú",
+      "type": "object",
+      "properties": {
+        "categoria_id": { "type": "number" },
+        "nombre": { "type": "string" },
+        "precio": { "type": "number" },
+        "disponible": { "type": "boolean" }
+      },
+      "required": ["categoria_id", "nombre", "precio", "disponible"]
+    },
+    "Sabor": {
+      "title": "Sabor",
+      "description": "Sabor de helado, jugo o aromática",
+      "type": "object",
+      "properties": {
+        "nombre": { "type": "string" },
+        "tipo": { "type": "string", "enum": ["helado", "jugo", "aromatica"] },
+        "disponible": { "type": "boolean" }
+      },
+      "required": ["nombre", "tipo", "disponible"]
+    },
+    "Pedido": {
+      "title": "Pedido",
+      "description": "Un pedido de una mesa",
+      "type": "object",
+      "properties": {
+        "mesa_id": { "type": "string" },
+        "estado": { "type": "string", "enum": ["abierto", "pagado", "cancelado"] },
+        "creado_en": { "type": "string", "format": "date-time" },
+        "juego_minutos": { "type": "number" },
+        "juego_inicio": { "type": "string", "format": "date-time" },
+        "juego_estado": { "type": "string", "enum": ["activo", "pausado"] },
+        "juego_restante_ms": { "type": "number" }
+      },
+      "required": ["mesa_id", "estado", "creado_en"]
+    },
+    "PedidoItem": {
+      "title": "PedidoItem",
+      "description": "Un item dentro de un pedido",
+      "type": "object",
+      "properties": {
+        "pedido_id": { "type": "string" },
+        "producto_id": { "type": "string" },
+        "producto_nombre": { "type": "string" },
+        "cantidad": { "type": "number" },
+        "estado": { "type": "string", "enum": ["pendiente", "preparando", "listo", "entregado"] },
+        "notas": { "type": "string" },
+        "pagado_cantidad": { "type": "number" },
+        "creado_en": { "type": "string", "format": "date-time" }
+      },
+      "required": ["pedido_id", "producto_id", "producto_nombre", "cantidad", "estado", "creado_en"]
+    },
+    "Pago": {
+      "title": "Pago",
+      "description": "Un pago realizado",
+      "type": "object",
+      "properties": {
+        "pedido_id": { "type": "string" },
+        "metodo": { "type": "string" },
+        "monto": { "type": "number" },
+        "creado_en": { "type": "string", "format": "date-time" }
+      },
+      "required": ["pedido_id", "metodo", "monto", "creado_en"]
+    },
+    "Gasto": {
+      "title": "Gasto",
+      "description": "Un gasto del restaurante",
+      "type": "object",
+      "properties": {
+        "descripcion": { "type": "string" },
+        "categoria": { "type": "string" },
+        "monto": { "type": "number" },
+        "fecha": { "type": "string", "format": "date-time" }
+      },
+      "required": ["descripcion", "categoria", "monto", "fecha"]
+    }
+  },
+  "firestore": {
+    "mesas": {
+      "schema": { "$ref": "#/entities/Mesa" },
+      "description": "Mesas del restaurante"
+    },
+    "categorias": {
+      "schema": { "$ref": "#/entities/Categoria" },
+      "description": "Categorías del menú"
+    },
+    "productos": {
+      "schema": { "$ref": "#/entities/Producto" },
+      "description": "Productos del menú"
+    },
+    "sabores": {
+      "schema": { "$ref": "#/entities/Sabor" },
+      "description": "Sabores disponibles"
+    },
+    "pedidos": {
+      "schema": { "$ref": "#/entities/Pedido" },
+      "description": "Pedidos activos e históricos"
+    },
+    "pedido_items": {
+      "schema": { "$ref": "#/entities/PedidoItem" },
+      "description": "Items de los pedidos"
+    },
+    "pagos": {
+      "schema": { "$ref": "#/entities/Pago" },
+      "description": "Pagos registrados"
+    },
+    "gastos": {
+      "schema": { "$ref": "#/entities/Gasto" },
+      "description": "Gastos registrados"
+    }
+  }
+}

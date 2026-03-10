@@ -3,6 +3,22 @@ import { Pedido, Producto, Categoria } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
 import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package, Edit3, Plus, Minus, Trash2, CheckCircle2, XCircle, MessageCircle } from 'lucide-react';
+import { 
+  subscribeToPedidosActivos, 
+  subscribeToProductos, 
+  subscribeToDraftOrders, 
+  subscribeToCategorias,
+  subscribeToGastos,
+  addGasto,
+  saveProducto,
+  deleteProducto,
+  toggleProductoAvailability,
+  processPayment,
+  cancelOrderItem,
+  pauseTimer,
+  resumeTimer,
+  getReportes
+} from '../services/db';
 
 type AdminTab = 'caja' | 'gastos' | 'ventas' | 'productos';
 
@@ -60,102 +76,68 @@ export default function AdminView() {
   const [reporteVentas, setReporteVentas] = useState<ReporteVentas>({ ventas: 0, gastos: 0, ganancia: 0 });
   const [reporteProductos, setReporteProductos] = useState<ReporteProducto[]>([]);
 
-  const fetchData = useCallback(async () => {
-    try {
-      const [pedidosRes, prodRes, draftRes, catRes] = await Promise.all([
-        fetch('/api/pedidos/activos'),
-        fetch('/api/productos'),
-        fetch('/api/pedidos/draft'),
-        fetch('/api/categorias')
-      ]);
-      
-      if (pedidosRes.ok) setPedidos(await pedidosRes.json());
-      if (prodRes.ok) setProductos(await prodRes.json());
-      if (draftRes.ok) setDraftOrders(await draftRes.json());
-      if (catRes.ok) setCategorias(await catRes.json());
-    } catch (error) {
-      console.error('Error fetching data:', error);
-    }
+  useEffect(() => {
+    const unsubPedidos = subscribeToPedidosActivos(setPedidos);
+    const unsubProd = subscribeToProductos(setProductos);
+    const unsubDrafts = subscribeToDraftOrders(setDraftOrders);
+    const unsubCat = subscribeToCategorias(setCategorias);
+
+    return () => {
+      unsubPedidos();
+      unsubProd();
+      unsubDrafts();
+      unsubCat();
+    };
   }, []);
 
-  const fetchGastos = useCallback(async () => {
-    try {
-      const res = await fetch(`/api/gastos?fecha=${reporteFecha}`);
-      if (res.ok) setGastos(await res.json());
-    } catch (error) {
-      console.error('Error fetching gastos:', error);
+  useEffect(() => {
+    if (activeTab === 'gastos') {
+      const unsubGastos = subscribeToGastos(reporteFecha, setGastos);
+      return () => unsubGastos();
     }
-  }, [reporteFecha]);
+  }, [activeTab, reporteFecha]);
 
   const fetchReportes = useCallback(async () => {
     try {
-      const [ventasRes, prodRes] = await Promise.all([
-        fetch(`/api/reportes/ventas?fecha=${reporteFecha}`),
-        fetch(`/api/reportes/productos?fecha=${reporteFecha}`)
-      ]);
-      
-      if (ventasRes.ok) setReporteVentas(await ventasRes.json());
-      if (prodRes.ok) setReporteProductos(await prodRes.json());
+      const { ventas, productos } = await getReportes(reporteFecha);
+      setReporteVentas(ventas);
+      setReporteProductos(productos);
     } catch (error) {
       console.error('Error fetching reportes:', error);
     }
   }, [reporteFecha]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  useEffect(() => {
-    if (activeTab === 'gastos') fetchGastos();
     if (activeTab === 'ventas') fetchReportes();
-  }, [activeTab, reporteFecha, fetchGastos, fetchReportes]);
-
-  useSSE('/api/events', () => {
-    fetchData();
-    if (activeTab === 'ventas') fetchReportes();
-  });
+  }, [activeTab, reporteFecha, fetchReportes]);
 
   const handleAddGasto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newGasto.descripcion || !newGasto.monto) return;
 
-    await fetch('/api/gastos', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...newGasto,
-        monto: parseFloat(newGasto.monto),
-        fecha: reporteFecha
-      })
+    await addGasto({
+      ...newGasto,
+      monto: parseFloat(newGasto.monto),
+      fecha: reporteFecha
     });
     
     setNewGasto({ descripcion: '', categoria: 'insumos', monto: '' });
-    fetchGastos();
     if (activeTab === 'ventas') fetchReportes();
   };
 
   const handleSaveProducto = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingProducto) {
-      await fetch(`/api/productos/${editingProducto.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingProducto)
-      });
+      await saveProducto(editingProducto);
       setEditingProducto(null);
     } else {
       if (!newProducto.nombre || !newProducto.precio) return;
-      await fetch('/api/productos', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...newProducto,
-          precio: parseFloat(newProducto.precio)
-        })
+      await saveProducto({
+        ...newProducto,
+        precio: parseFloat(newProducto.precio)
       });
       setNewProducto({ nombre: '', precio: '', categoria_id: 1, disponible: 1 });
     }
-    fetchData();
   };
 
   const handleDeleteProducto = (id: number) => {
@@ -165,23 +147,16 @@ export default function AdminView() {
   const confirmDeleteProducto = async () => {
     if (productoToCancel === null) return;
     
-    const res = await fetch(`/api/productos/${productoToCancel}`, { method: 'DELETE' });
-    if (!res.ok) {
-      const data = await res.json();
-      alert(data.error);
-    } else {
-      fetchData();
+    try {
+      await deleteProducto(productoToCancel);
+    } catch (error: any) {
+      alert(error.message);
     }
     setProductoToCancel(null);
   };
 
-  const toggleProductAvailability = async (producto: Producto) => {
-    await fetch(`/api/productos/${producto.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...producto, disponible: producto.disponible ? 0 : 1 })
-    });
-    fetchData();
+  const handleToggleProductAvailability = async (producto: Producto) => {
+    await toggleProductoAvailability(producto.id, producto.disponible === 1);
   };
 
   const getProductPrice = (id: number) => {
@@ -265,17 +240,9 @@ export default function AdminView() {
         .filter(([_, cantidad]) => (cantidad as number) > 0)
         .map(([id, cantidad]) => ({ id: parseInt(id), cantidad: cantidad as number }));
 
-      await fetch(`/api/pedidos/${selectedPedido.id}/pagar-items`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ metodo: paymentMethod, monto, cerrarMesa, items: itemsToPayArray })
-      });
+      await processPayment(selectedPedido.id, monto, paymentMethod, cerrarMesa, itemsToPayArray);
     } else {
-      await fetch(`/api/pedidos/${selectedPedido.id}/pagar`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ metodo: paymentMethod, monto, cerrarMesa })
-      });
+      await processPayment(selectedPedido.id, monto, paymentMethod, cerrarMesa);
     }
     
     if (cerrarMesa) {
@@ -283,7 +250,6 @@ export default function AdminView() {
       setSplitMode(false);
       setItemsToPay({});
     } else {
-      fetchData();
       // Reset split mode state
       setSplitMode(false);
       setItemsToPay({});
@@ -300,28 +266,26 @@ export default function AdminView() {
   };
 
   const confirmCancelItem = async () => {
-    if (itemToCancel === null) return;
+    if (itemToCancel === null || !selectedPedido) return;
     
-    await fetch(`/api/pedido_items/${itemToCancel}`, { method: 'DELETE' });
+    await cancelOrderItem(selectedPedido.id, itemToCancel);
     
     // Update local state to reflect the change immediately
-    if (selectedPedido) {
-      const updatedItems = selectedPedido.items.filter(item => item.id !== itemToCancel);
-      if (updatedItems.length === 0) {
-        setSelectedPedido(null);
-      } else {
-        setSelectedPedido({ ...selectedPedido, items: updatedItems });
-      }
+    const updatedItems = selectedPedido.items.filter(item => item.id !== itemToCancel);
+    if (updatedItems.length === 0) {
+      setSelectedPedido(null);
+    } else {
+      setSelectedPedido({ ...selectedPedido, items: updatedItems });
     }
     setItemToCancel(null);
   };
 
-  const pauseTimer = async (pedidoId: number) => {
-    await fetch(`/api/pedidos/${pedidoId}/pausar`, { method: 'POST' });
+  const handlePauseTimer = async (pedidoId: number) => {
+    await pauseTimer(pedidoId);
   };
 
-  const resumeTimer = async (pedidoId: number) => {
-    await fetch(`/api/pedidos/${pedidoId}/reanudar`, { method: 'POST' });
+  const handleResumeTimer = async (pedidoId: number) => {
+    await resumeTimer(pedidoId);
   };
 
   const paymentMethods = [
@@ -377,11 +341,11 @@ export default function AdminView() {
                           className="text-sm bg-white/50 px-2 py-1 rounded-md shadow-sm"
                         />
                         {selectedPedido.juego_estado === 'activo' ? (
-                          <button onClick={() => pauseTimer(selectedPedido.id)} className="p-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 shadow-sm" title="Pausar">
+                          <button onClick={() => handlePauseTimer(selectedPedido.id)} className="p-1 bg-amber-100 text-amber-700 rounded hover:bg-amber-200 shadow-sm" title="Pausar">
                             <Pause className="w-4 h-4" />
                           </button>
                         ) : (
-                          <button onClick={() => resumeTimer(selectedPedido.id)} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 shadow-sm" title="Reanudar">
+                          <button onClick={() => handleResumeTimer(selectedPedido.id)} className="p-1 bg-green-100 text-green-700 rounded hover:bg-green-200 shadow-sm" title="Reanudar">
                             <Play className="w-4 h-4" />
                           </button>
                         )}
@@ -1025,7 +989,7 @@ export default function AdminView() {
                             <td className="p-4 text-right font-bold text-indigo-600">${prod.precio.toLocaleString()}</td>
                             <td className="p-4 text-center">
                               <button
-                                onClick={() => toggleProductAvailability(prod)}
+                                onClick={() => handleToggleProductAvailability(prod)}
                                 className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-bold transition-colors ${
                                   prod.disponible !== 0 
                                     ? 'bg-green-100 text-green-700 hover:bg-green-200' 

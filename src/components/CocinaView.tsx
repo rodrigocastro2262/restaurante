@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Pedido } from '../types';
 import { useSSE } from '../hooks/useSSE';
 import { Clock, ChefHat, CheckCircle2, Volume2, VolumeX, Edit3 } from 'lucide-react';
+import { subscribeToPedidosActivos, subscribeToDraftOrders, updateItemStatus } from '../services/db';
 
 interface DraftOrder {
   mesa_id: number;
@@ -47,25 +48,15 @@ export default function CocinaView() {
   const [knownItemIds, setKnownItemIds] = useState<Set<number>>(new Set());
   const isInitialLoad = useRef(true);
 
-  const fetchPedidos = useCallback(async () => {
-    try {
-      const [pedidosRes, draftRes] = await Promise.all([
-        fetch('/api/pedidos/activos'),
-        fetch('/api/pedidos/draft')
-      ]);
-      
-      if (pedidosRes.ok) setPedidos(await pedidosRes.json());
-      if (draftRes.ok) setDraftOrders(await draftRes.json());
-    } catch (error) {
-      console.error('Error fetching pedidos:', error);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchPedidos();
-  }, [fetchPedidos]);
+    const unsubPedidos = subscribeToPedidosActivos(setPedidos);
+    const unsubDrafts = subscribeToDraftOrders(setDraftOrders);
 
-  useSSE('/api/events', fetchPedidos);
+    return () => {
+      unsubPedidos();
+      unsubDrafts();
+    };
+  }, []);
 
   const enableAudio = () => {
     setAudioEnabled(true);
@@ -148,12 +139,8 @@ export default function CocinaView() {
     return () => clearInterval(interval);
   }, [pedidos, announcedTimers, audioEnabled]);
 
-  const updateItemStatus = async (itemId: number, newStatus: string) => {
-    await fetch(`/api/pedido_items/${itemId}/estado`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ estado: newStatus })
-    });
+  const handleUpdateItemStatus = async (pedidoId: number, itemId: number, newStatus: string) => {
+    await updateItemStatus(pedidoId, itemId, newStatus as any);
   };
 
   const mesasActivas = pedidos.filter(p => p.items.some(i => i.estado !== 'entregado'));
@@ -236,7 +223,7 @@ export default function CocinaView() {
                     <div className="flex justify-end mt-1">
                       <select 
                         value={item.estado}
-                        onChange={(e) => updateItemStatus(item.id, e.target.value)}
+                        onChange={(e) => handleUpdateItemStatus(pedido.id, item.id, e.target.value)}
                         className={`text-sm font-bold rounded-lg px-3 py-1.5 border-0 cursor-pointer outline-none ring-2 ring-transparent focus:ring-indigo-500 transition-all ${
                           item.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
                           item.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :

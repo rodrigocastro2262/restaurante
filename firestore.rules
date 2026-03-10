@@ -1,0 +1,95 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: mesas
+    //   - numero: number
+    //   - nombre: string
+    //   - estado: string (disponible, ocupada)
+    //
+    // Collection: categorias
+    //   - id: number
+    //   - nombre: string
+    //
+    // Collection: productos
+    //   - categoria_id: number
+    //   - nombre: string
+    //   - precio: number
+    //   - disponible: boolean
+    //
+    // Collection: sabores
+    //   - nombre: string
+    //   - tipo: string (helado, jugo, aromatica)
+    //   - disponible: boolean
+    //
+    // Collection: pedidos
+    //   - mesa_id: string
+    //   - estado: string (abierto, pagado, cancelado)
+    //   - creado_en: string (ISO date)
+    //   - juego_minutos: number (optional)
+    //   - juego_inicio: string (optional)
+    //   - juego_estado: string (optional)
+    //   - juego_restante_ms: number (optional)
+    //
+    // Collection: pedido_items
+    //   - pedido_id: string
+    //   - producto_id: string
+    //   - producto_nombre: string
+    //   - cantidad: number
+    //   - estado: string (pendiente, preparando, listo, entregado)
+    //   - notas: string (optional)
+    //   - pagado_cantidad: number (optional)
+    //   - creado_en: string (ISO date)
+    //
+    // Collection: pagos
+    //   - pedido_id: string
+    //   - metodo: string
+    //   - monto: number
+    //   - creado_en: string (ISO date)
+    //
+    // Collection: gastos
+    //   - descripcion: string
+    //   - categoria: string
+    //   - monto: number
+    //   - fecha: string (ISO date)
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Since this is an internal POS system, we allow any authenticated user (employee) to read/write.
+    // In a production environment, you would restrict this to specific employee UIDs or use Custom Claims.
+
+    match /mesas/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    match /categorias/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    match /productos/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    match /sabores/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    match /pedidos/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    match /pedido_items/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    match /pagos/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+    match /gastos/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
+  }
+}

@@ -1,22 +1,41 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import MeseroView from './components/MeseroView';
 import CocinaView from './components/CocinaView';
 import AdminView from './components/AdminView';
 import { Utensils, ChefHat, Receipt, LogOut, Lock, X } from 'lucide-react';
+import { auth, loginWithGoogle, logout } from './firebase';
+import { onAuthStateChanged, User } from 'firebase/auth';
+import { seedDatabase } from './services/db';
 
 type View = 'mesero' | 'cocina' | 'admin';
 type Role = 'admin' | 'mesero' | null;
 
 export default function App() {
+  const [user, setUser] = useState<User | null>(null);
   const [role, setRole] = useState<Role>(null);
   const [currentView, setCurrentView] = useState<View>('mesero');
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [isAuthReady, setIsAuthReady] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      setUser(currentUser);
+      setIsAuthReady(true);
+      if (currentUser) {
+        try {
+          await seedDatabase();
+        } catch (e) {
+          console.error("Error seeding DB:", e);
+        }
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   const handleAdminLogin = (e: React.FormEvent) => {
     e.preventDefault();
-    // Simple password check (can be changed later or moved to backend)
     if (adminPassword === 'admin123') {
       setRole('admin');
       setCurrentView('admin');
@@ -28,6 +47,32 @@ export default function App() {
     }
   };
 
+  if (!isAuthReady) {
+    return <div className="h-screen w-screen flex items-center justify-center bg-gray-100">Cargando...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gray-100 font-sans relative">
+        <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full border border-gray-100">
+          <div className="flex justify-center mb-6">
+            <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
+              <Utensils className="w-8 h-8 text-white" />
+            </div>
+          </div>
+          <h1 className="text-2xl font-black text-center text-gray-900 mb-2 tracking-tight">Restaurante POS</h1>
+          <p className="text-center text-gray-500 mb-8 text-sm">Inicia sesión para continuar</p>
+          <button
+            onClick={loginWithGoogle}
+            className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg transition-colors shadow-md flex items-center justify-center gap-3"
+          >
+            Iniciar Sesión con Google
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   if (!role) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-gray-100 font-sans relative">
@@ -38,7 +83,7 @@ export default function App() {
             </div>
           </div>
           <h1 className="text-2xl font-black text-center text-gray-900 mb-2 tracking-tight">Restaurante POS</h1>
-          <p className="text-center text-gray-500 mb-8 text-sm">Selecciona tu rol para ingresar</p>
+          <p className="text-center text-gray-500 mb-8 text-sm">Hola, {user.displayName}. Selecciona tu rol</p>
           <div className="space-y-4">
             <button
               onClick={() => { setRole('mesero'); setCurrentView('mesero'); }}
@@ -53,6 +98,12 @@ export default function App() {
             >
               <Receipt className="w-6 h-6" />
               Ingresar como Admin
+            </button>
+            <button
+              onClick={logout}
+              className="w-full py-3 text-gray-500 hover:text-gray-700 text-sm font-medium transition-colors"
+            >
+              Cerrar Sesión
             </button>
           </div>
         </div>
@@ -159,7 +210,7 @@ export default function App() {
             <button
               onClick={() => { setRole(null); setCurrentView('mesero'); }}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-              title="Cerrar Sesión"
+              title="Cambiar Rol"
             >
               <LogOut className="w-5 h-5" />
             </button>
