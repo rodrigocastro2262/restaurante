@@ -78,7 +78,15 @@ export default function App() {
             </div>
           </div>
           <h1 className="text-2xl font-black text-center text-gray-900 mb-2 tracking-tight">Restaurante POS</h1>
-          <p className="text-center text-gray-500 mb-8 text-sm">Inicia sesión para continuar</p>
+          <p className="text-center text-gray-500 mb-6 text-sm">Inicia sesión para continuar</p>
+          
+          <div className="mb-6 p-3 bg-blue-50 rounded-lg border border-blue-100">
+            <p className="text-xs text-blue-800 text-center">
+              <span className="font-bold">📱 ¿Estás en el celular?</span><br/>
+              Si abriste esto desde WhatsApp, toca los 3 puntos arriba y elige <strong>"Abrir en Chrome/Safari"</strong> para poder iniciar sesión.
+            </p>
+          </div>
+
           {authError && (
             <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center border border-red-100">
               {authError}
