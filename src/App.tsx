@@ -17,6 +17,7 @@ export default function App() {
   const [showAdminLogin, setShowAdminLogin] = useState(false);
   const [adminPassword, setAdminPassword] = useState('');
   const [loginError, setLoginError] = useState('');
+  const [authError, setAuthError] = useState('');
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
@@ -47,6 +48,22 @@ export default function App() {
     }
   };
 
+  const handleGoogleLogin = async () => {
+    setAuthError('');
+    try {
+      await loginWithGoogle();
+    } catch (error: any) {
+      console.error("Login failed:", error);
+      if (error.code === 'auth/popup-blocked') {
+        setAuthError('El navegador bloqueó la ventana emergente. Por favor, permite los pop-ups para este sitio.');
+      } else if (error.code === 'auth/unauthorized-domain') {
+        setAuthError('Este dominio no está autorizado en Firebase. Contacta al soporte.');
+      } else {
+        setAuthError(error.message || 'Error al iniciar sesión. Intenta nuevamente.');
+      }
+    }
+  };
+
   if (!isAuthReady) {
     return <div className="h-screen w-screen flex items-center justify-center bg-gray-100">Cargando...</div>;
   }
@@ -62,8 +79,13 @@ export default function App() {
           </div>
           <h1 className="text-2xl font-black text-center text-gray-900 mb-2 tracking-tight">Restaurante POS</h1>
           <p className="text-center text-gray-500 mb-8 text-sm">Inicia sesión para continuar</p>
+          {authError && (
+            <div className="mb-4 p-3 bg-red-50 text-red-600 text-sm rounded-lg text-center border border-red-100">
+              {authError}
+            </div>
+          )}
           <button
-            onClick={loginWithGoogle}
+            onClick={handleGoogleLogin}
             className="w-full py-4 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-lg transition-colors shadow-md flex items-center justify-center gap-3"
           >
             Iniciar Sesión con Google
