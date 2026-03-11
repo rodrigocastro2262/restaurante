@@ -78,10 +78,18 @@ export default function AdminView() {
   const [reporteProductos, setReporteProductos] = useState<ReporteProducto[]>([]);
 
   // Sound state
-  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [audioEnabled, setAudioEnabled] = useState(() => {
+    return localStorage.getItem('audioEnabled') !== 'false';
+  });
   const [knownItemIds, setKnownItemIds] = useState<Set<number>>(new Set());
   const [announcedTimers, setAnnouncedTimers] = useState<Set<number>>(new Set());
   const isInitialLoad = React.useRef(true);
+
+  const toggleAudio = () => {
+    const newState = !audioEnabled;
+    setAudioEnabled(newState);
+    localStorage.setItem('audioEnabled', String(newState));
+  };
 
   useEffect(() => {
     const unsubPedidos = subscribeToPedidosActivos(setPedidos);
@@ -702,7 +710,7 @@ export default function AdminView() {
         
         <div className="flex items-center gap-4">
           <button
-            onClick={() => setAudioEnabled(!audioEnabled)}
+            onClick={toggleAudio}
             className={`p-2 rounded-lg transition-colors ${
               audioEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-400'
             }`}

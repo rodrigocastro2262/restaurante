@@ -42,7 +42,9 @@ const WaitTimer = ({ creadoEn }: { creadoEn: string }) => {
 export default function CocinaView() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [draftOrders, setDraftOrders] = useState<DraftOrder[]>([]);
-  const [audioEnabled, setAudioEnabled] = useState(false);
+  const [audioEnabled, setAudioEnabled] = useState(() => {
+    return localStorage.getItem('audioEnabled') !== 'false';
+  });
   const [announcedTimers, setAnnouncedTimers] = useState<Set<number>>(new Set());
   const [knownItemIds, setKnownItemIds] = useState<Set<number>>(new Set());
   const isInitialLoad = useRef(true);
@@ -57,11 +59,15 @@ export default function CocinaView() {
     };
   }, []);
 
-  const enableAudio = () => {
-    setAudioEnabled(true);
-    const msg = new SpeechSynthesisUtterance("Sonidos de cocina activados");
-    msg.lang = 'es-ES';
-    window.speechSynthesis.speak(msg);
+  const toggleAudio = () => {
+    const newState = !audioEnabled;
+    setAudioEnabled(newState);
+    localStorage.setItem('audioEnabled', String(newState));
+    if (newState) {
+      const msg = new SpeechSynthesisUtterance("Sonidos de cocina activados");
+      msg.lang = 'es-ES';
+      window.speechSynthesis.speak(msg);
+    }
   };
 
   // Check for new orders
@@ -152,7 +158,7 @@ export default function CocinaView() {
           <h1 className="text-3xl font-bold text-gray-900">KDS - Cocina (Por Mesa)</h1>
         </div>
         <button
-          onClick={() => setAudioEnabled(!audioEnabled)}
+          onClick={toggleAudio}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold transition-colors ${
             audioEnabled 
               ? 'bg-green-100 text-green-700 border-2 border-green-200' 
@@ -190,11 +196,6 @@ export default function CocinaView() {
                       <span className="font-black text-lg text-indigo-900">{item.cantidad}x</span>
                       <span className="text-gray-800 font-medium leading-tight pt-1">{item.producto_nombre}</span>
                     </div>
-                    {item.sabores && item.sabores.length > 0 && (
-                      <div className="text-sm text-pink-600 bg-pink-50 p-2 rounded-lg font-medium border border-pink-100">
-                        Sabores: {item.sabores.join(', ')}
-                      </div>
-                    )}
                     {item.notas && (
                       <div className="text-sm text-indigo-600 bg-indigo-50 p-2 rounded-lg italic border border-indigo-100">
                         Nota: {item.notas}
@@ -219,11 +220,6 @@ export default function CocinaView() {
                       <span className="font-black text-lg text-gray-900">{item.cantidad}x</span>
                       <span className="text-gray-800 font-medium leading-tight pt-1">{item.producto_nombre}</span>
                     </div>
-                    {item.sabores && item.sabores.length > 0 && (
-                      <div className="text-sm text-pink-600 bg-pink-50 p-2 rounded-lg font-medium border border-pink-100">
-                        Sabores: {item.sabores.join(', ')}
-                      </div>
-                    )}
                     {item.notas && (
                       <div className="text-sm text-amber-700 bg-amber-50 p-2 rounded-lg italic border border-amber-200 font-medium">
                         Nota: {item.notas}
