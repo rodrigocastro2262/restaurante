@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Pedido } from '../types';
-import { useSSE } from '../hooks/useSSE';
 import { Clock, ChefHat, CheckCircle2, Volume2, VolumeX, Edit3 } from 'lucide-react';
 import { subscribeToPedidosActivos, subscribeToDraftOrders, updateItemStatus } from '../services/db';
 
 interface DraftOrder {
   mesa_id: number;
-  items: { producto_id: number; producto_nombre: string; cantidad: number }[];
+  items: { producto_id: number; producto_nombre: string; cantidad: number; notas?: string; sabores?: string[] }[];
   updated_at: number;
 }
 
@@ -191,6 +190,11 @@ export default function CocinaView() {
                       <span className="font-black text-lg text-indigo-900">{item.cantidad}x</span>
                       <span className="text-gray-800 font-medium leading-tight pt-1">{item.producto_nombre}</span>
                     </div>
+                    {item.sabores && item.sabores.length > 0 && (
+                      <div className="text-sm text-pink-600 bg-pink-50 p-2 rounded-lg font-medium border border-pink-100">
+                        Sabores: {item.sabores.join(', ')}
+                      </div>
+                    )}
                     {item.notas && (
                       <div className="text-sm text-indigo-600 bg-indigo-50 p-2 rounded-lg italic border border-indigo-100">
                         Nota: {item.notas}
@@ -215,6 +219,11 @@ export default function CocinaView() {
                       <span className="font-black text-lg text-gray-900">{item.cantidad}x</span>
                       <span className="text-gray-800 font-medium leading-tight pt-1">{item.producto_nombre}</span>
                     </div>
+                    {item.sabores && item.sabores.length > 0 && (
+                      <div className="text-sm text-pink-600 bg-pink-50 p-2 rounded-lg font-medium border border-pink-100">
+                        Sabores: {item.sabores.join(', ')}
+                      </div>
+                    )}
                     {item.notas && (
                       <div className="text-sm text-amber-700 bg-amber-50 p-2 rounded-lg italic border border-amber-200 font-medium">
                         Nota: {item.notas}

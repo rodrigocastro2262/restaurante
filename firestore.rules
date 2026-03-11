@@ -91,5 +91,8 @@ service cloud.firestore {
     match /gastos/{document=**} {
       allow read, write: if isAuthenticated();
     }
+    match /draft_orders/{document=**} {
+      allow read, write: if isAuthenticated();
+    }
   }
 }

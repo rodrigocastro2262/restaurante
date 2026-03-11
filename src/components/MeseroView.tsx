@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Mesa, Categoria, Producto, Pedido, Sabor } from '../types';
-import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
 import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search, MessageCircle } from 'lucide-react';
 import { 

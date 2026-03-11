@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Pedido, Producto, Categoria } from '../types';
-import { useSSE } from '../hooks/useSSE';
 import { TimerDisplay } from './TimerDisplay';
 import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package, Edit3, Plus, Minus, Trash2, CheckCircle2, XCircle, MessageCircle } from 'lucide-react';
 import { 
@@ -24,7 +23,7 @@ type AdminTab = 'caja' | 'gastos' | 'ventas' | 'productos';
 
 interface DraftOrder {
   mesa_id: number;
-  items: { producto_id: number; producto_nombre: string; cantidad: number }[];
+  items: { producto_id: number; producto_nombre: string; cantidad: number; notas?: string; sabores?: string[] }[];
   updated_at: number;
 }
 
@@ -412,6 +411,11 @@ export default function AdminView() {
                             )}
                           </div>
                         </div>
+                        {item.sabores && item.sabores.length > 0 && (
+                          <div className="text-xs text-pink-600 font-medium ml-6">
+                            Sabores: {item.sabores.join(', ')}
+                          </div>
+                        )}
                         {item.notas && (
                           <div className="text-xs text-gray-600 italic ml-6">
                             Nota: {item.notas}

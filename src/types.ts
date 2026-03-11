@@ -22,7 +22,7 @@ export interface Sabor {
   id: number;
   nombre: string;
   tipo: 'helado' | 'jugo' | 'aromatica';
-  disponible: number; // 0 or 1
+  disponible: boolean;
 }
 
 export interface PedidoItem {
@@ -33,6 +33,7 @@ export interface PedidoItem {
   cantidad: number;
   estado: 'pendiente' | 'preparando' | 'listo' | 'entregado';
   notas?: string;
+  sabores?: string[];
   pagado_cantidad?: number;
 }
 
