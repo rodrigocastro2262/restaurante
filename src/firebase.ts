@@ -6,7 +6,7 @@ import firebaseConfig from '../firebase-applet-config.json';
 let app;
 let db: any;
 let auth: any;
-export const googleProvider = new GoogleAuthProvider();
+let googleProvider: any;
 
 try {
   app = initializeApp(firebaseConfig);
@@ -21,6 +21,9 @@ export { db, auth };
 
 export const loginWithGoogle = async () => {
   if (!auth) throw new Error("Firebase Auth no está inicializado. Verifica si tu navegador bloquea cookies o almacenamiento local.");
+  if (!googleProvider) {
+    googleProvider = new GoogleAuthProvider();
+  }
   try {
     await signInWithPopup(auth, googleProvider);
   } catch (error) {

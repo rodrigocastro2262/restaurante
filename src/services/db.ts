@@ -13,21 +13,25 @@ let gastosRef: any;
 let draftRef: any;
 
 if (db) {
-  mesasRef = collection(db, 'mesas');
-  categoriasRef = collection(db, 'categorias');
-  productosRef = collection(db, 'productos');
-  saboresRef = collection(db, 'sabores');
-  pedidosRef = collection(db, 'pedidos');
-  pagosRef = collection(db, 'pagos');
-  gastosRef = collection(db, 'gastos');
-  draftRef = collection(db, 'draft_orders');
+  try {
+    mesasRef = collection(db, 'mesas');
+    categoriasRef = collection(db, 'categorias');
+    productosRef = collection(db, 'productos');
+    saboresRef = collection(db, 'sabores');
+    pedidosRef = collection(db, 'pedidos');
+    pagosRef = collection(db, 'pagos');
+    gastosRef = collection(db, 'gastos');
+    draftRef = collection(db, 'draft_orders');
+  } catch (error) {
+    console.error("Error initializing collections:", error);
+  }
 }
 
 export const subscribeToMesas = (callback: (mesas: Mesa[]) => void) => {
   if (!db) return () => {};
   const q = query(mesasRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Mesa)));
+    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...(doc.data() as any) } as Mesa)));
   });
 };
 
@@ -35,7 +39,7 @@ export const subscribeToCategorias = (callback: (categorias: Categoria[]) => voi
   if (!db) return () => {};
   const q = query(categoriasRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Categoria)));
+    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...(doc.data() as any) } as Categoria)));
   });
 };
 
@@ -43,7 +47,7 @@ export const subscribeToProductos = (callback: (productos: Producto[]) => void) 
   if (!db) return () => {};
   const q = query(productosRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Producto)));
+    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...(doc.data() as any) } as Producto)));
   });
 };
 
@@ -51,7 +55,7 @@ export const subscribeToSabores = (callback: (sabores: Sabor[]) => void) => {
   if (!db) return () => {};
   const q = query(saboresRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Sabor)));
+    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...(doc.data() as any) } as Sabor)));
   });
 };
 
@@ -59,7 +63,7 @@ export const subscribeToPedidosActivos = (callback: (pedidos: Pedido[]) => void)
   if (!db) return () => {};
   const q = query(pedidosRef, where('estado', '==', 'abierto'));
   return onSnapshot(q, (snapshot) => {
-    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Pedido)));
+    callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...(doc.data() as any) } as Pedido)));
   });
 };
 
@@ -312,7 +316,7 @@ export const cancelItem = async (pedidoId: number, itemId: number) => {
 export const subscribeToGastos = (fecha: string, callback: (gastos: any[]) => void) => {
   const q = query(gastosRef, where('fecha', '==', fecha));
   return onSnapshot(q, (snapshot) => {
-    const data = snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() }));
+    const data = snapshot.docs.map(doc => ({ id: Number(doc.id), ...(doc.data() as any) }));
     callback(data);
   });
 };
@@ -528,11 +532,11 @@ export const getReportes = async (fecha: string) => {
 
   const pagosQ = query(pagosRef, where('creado_en', '>=', startStr), where('creado_en', '<=', endStr));
   const pagosSnap = await getDocs(pagosQ);
-  const totalVentas = pagosSnap.docs.reduce((sum, doc) => sum + doc.data().monto, 0);
+  const totalVentas = pagosSnap.docs.reduce((sum, doc) => sum + (doc.data() as any).monto, 0);
 
   const gastosQ = query(gastosRef, where('fecha', '==', fecha));
   const gastosSnap = await getDocs(gastosQ);
-  const totalGastos = gastosSnap.docs.reduce((sum, doc) => sum + doc.data().monto, 0);
+  const totalGastos = gastosSnap.docs.reduce((sum, doc) => sum + (doc.data() as any).monto, 0);
 
   const pedidosQ = query(pedidosRef, where('estado', '==', 'pagado'), where('creado_en', '>=', startStr), where('creado_en', '<=', endStr));
   const pedidosSnap = await getDocs(pedidosQ);
@@ -540,7 +544,7 @@ export const getReportes = async (fecha: string) => {
   const productCounts: Record<string, { cantidad: number; total: number }> = {};
   
   for (const pDoc of pedidosSnap.docs) {
-    const data = pDoc.data();
+    const data = pDoc.data() as any;
     for (const item of data.items) {
       if (!productCounts[item.producto_nombre]) {
         productCounts[item.producto_nombre] = { cantidad: 0, total: 0 };
@@ -555,7 +559,7 @@ export const getReportes = async (fecha: string) => {
 
   // Fetch current prices to estimate total per product
   const productosSnap = await getDocs(productosRef);
-  const productosMap = new Map(productosSnap.docs.map(d => [d.data().nombre, d.data().precio]));
+  const productosMap = new Map(productosSnap.docs.map(d => [(d.data() as any).nombre, (d.data() as any).precio]));
 
   const productos = Object.entries(productCounts).map(([nombre, stats]) => ({
     nombre,

@@ -208,8 +208,8 @@ export default function MeseroView() {
     setCart([]);
   };
 
-  const handleToggleSabor = async (id: number, currentState: boolean) => {
-    await toggleSabor(id, currentState);
+  const handleToggleSabor = async (id: number, currentState: boolean | number) => {
+    await toggleSabor(id, !!currentState);
   };
 
   if (selectedMesa) {
