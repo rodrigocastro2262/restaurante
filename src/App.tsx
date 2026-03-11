@@ -21,6 +21,11 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
 
   useEffect(() => {
+    if (!auth) {
+      setAuthError("Error de inicialización de Firebase. Es posible que el navegador esté bloqueando el almacenamiento local (cookies/localStorage). Por favor, ábrelo en Chrome o Safari normal.");
+      setIsAuthReady(true);
+      return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       setIsAuthReady(true);

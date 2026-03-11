@@ -3,16 +3,28 @@ import { collection, doc, setDoc, getDoc, getDocs, updateDoc, deleteDoc, onSnaps
 import { Mesa, Categoria, Producto, Pedido, Sabor } from '../types';
 
 // Colecciones
-const mesasRef = collection(db, 'mesas');
-const categoriasRef = collection(db, 'categorias');
-const productosRef = collection(db, 'productos');
-const saboresRef = collection(db, 'sabores');
-const pedidosRef = collection(db, 'pedidos');
-const pagosRef = collection(db, 'pagos');
-const gastosRef = collection(db, 'gastos');
-const draftRef = collection(db, 'draft_orders');
+let mesasRef: any;
+let categoriasRef: any;
+let productosRef: any;
+let saboresRef: any;
+let pedidosRef: any;
+let pagosRef: any;
+let gastosRef: any;
+let draftRef: any;
+
+if (db) {
+  mesasRef = collection(db, 'mesas');
+  categoriasRef = collection(db, 'categorias');
+  productosRef = collection(db, 'productos');
+  saboresRef = collection(db, 'sabores');
+  pedidosRef = collection(db, 'pedidos');
+  pagosRef = collection(db, 'pagos');
+  gastosRef = collection(db, 'gastos');
+  draftRef = collection(db, 'draft_orders');
+}
 
 export const subscribeToMesas = (callback: (mesas: Mesa[]) => void) => {
+  if (!db) return () => {};
   const q = query(mesasRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Mesa)));
@@ -20,6 +32,7 @@ export const subscribeToMesas = (callback: (mesas: Mesa[]) => void) => {
 };
 
 export const subscribeToCategorias = (callback: (categorias: Categoria[]) => void) => {
+  if (!db) return () => {};
   const q = query(categoriasRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Categoria)));
@@ -27,6 +40,7 @@ export const subscribeToCategorias = (callback: (categorias: Categoria[]) => voi
 };
 
 export const subscribeToProductos = (callback: (productos: Producto[]) => void) => {
+  if (!db) return () => {};
   const q = query(productosRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Producto)));
@@ -34,6 +48,7 @@ export const subscribeToProductos = (callback: (productos: Producto[]) => void) 
 };
 
 export const subscribeToSabores = (callback: (sabores: Sabor[]) => void) => {
+  if (!db) return () => {};
   const q = query(saboresRef, orderBy('id'));
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Sabor)));
@@ -41,6 +56,7 @@ export const subscribeToSabores = (callback: (sabores: Sabor[]) => void) => {
 };
 
 export const subscribeToPedidosActivos = (callback: (pedidos: Pedido[]) => void) => {
+  if (!db) return () => {};
   const q = query(pedidosRef, where('estado', '==', 'abierto'));
   return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Pedido)));
@@ -48,6 +64,7 @@ export const subscribeToPedidosActivos = (callback: (pedidos: Pedido[]) => void)
 };
 
 export const subscribeToDraftOrders = (callback: (drafts: any[]) => void) => {
+  if (!db) return () => {};
   return onSnapshot(draftRef, (snapshot) => {
     callback(snapshot.docs.map(doc => doc.data()));
   });

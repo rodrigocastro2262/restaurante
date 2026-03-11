@@ -79,7 +79,11 @@ export default function AdminView() {
 
   // Sound state
   const [audioEnabled, setAudioEnabled] = useState(() => {
-    return localStorage.getItem('audioEnabled') !== 'false';
+    try {
+      return localStorage.getItem('audioEnabled') !== 'false';
+    } catch (e) {
+      return true;
+    }
   });
   const [knownItemIds, setKnownItemIds] = useState<Set<number>>(new Set());
   const [announcedTimers, setAnnouncedTimers] = useState<Set<number>>(new Set());
@@ -88,7 +92,11 @@ export default function AdminView() {
   const toggleAudio = () => {
     const newState = !audioEnabled;
     setAudioEnabled(newState);
-    localStorage.setItem('audioEnabled', String(newState));
+    try {
+      localStorage.setItem('audioEnabled', String(newState));
+    } catch (e) {
+      console.warn("localStorage not available");
+    }
   };
 
   useEffect(() => {

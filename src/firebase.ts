@@ -3,12 +3,24 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/
 import { getFirestore } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
-export const auth = getAuth(app);
+let app;
+let db: any;
+let auth: any;
 export const googleProvider = new GoogleAuthProvider();
 
+try {
+  app = initializeApp(firebaseConfig);
+  db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+  auth = getAuth(app);
+} catch (error) {
+  console.error("Firebase initialization error:", error);
+  // We don't throw here so the app can at least render the error boundary or login screen with an error message
+}
+
+export { db, auth };
+
 export const loginWithGoogle = async () => {
+  if (!auth) throw new Error("Firebase Auth no está inicializado. Verifica si tu navegador bloquea cookies o almacenamiento local.");
   try {
     await signInWithPopup(auth, googleProvider);
   } catch (error) {
@@ -18,6 +30,7 @@ export const loginWithGoogle = async () => {
 };
 
 export const logout = async () => {
+  if (!auth) return;
   try {
     await signOut(auth);
   } catch (error) {

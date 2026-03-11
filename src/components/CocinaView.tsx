@@ -43,7 +43,11 @@ export default function CocinaView() {
   const [pedidos, setPedidos] = useState<Pedido[]>([]);
   const [draftOrders, setDraftOrders] = useState<DraftOrder[]>([]);
   const [audioEnabled, setAudioEnabled] = useState(() => {
-    return localStorage.getItem('audioEnabled') !== 'false';
+    try {
+      return localStorage.getItem('audioEnabled') !== 'false';
+    } catch (e) {
+      return true;
+    }
   });
   const [announcedTimers, setAnnouncedTimers] = useState<Set<number>>(new Set());
   const [knownItemIds, setKnownItemIds] = useState<Set<number>>(new Set());
@@ -62,7 +66,11 @@ export default function CocinaView() {
   const toggleAudio = () => {
     const newState = !audioEnabled;
     setAudioEnabled(newState);
-    localStorage.setItem('audioEnabled', String(newState));
+    try {
+      localStorage.setItem('audioEnabled', String(newState));
+    } catch (e) {
+      console.warn("localStorage not available");
+    }
     if (newState) {
       const msg = new SpeechSynthesisUtterance("Sonidos de cocina activados");
       msg.lang = 'es-ES';
