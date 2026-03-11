@@ -13,25 +13,29 @@ const gastosRef = collection(db, 'gastos');
 const draftRef = collection(db, 'draft_orders');
 
 export const subscribeToMesas = (callback: (mesas: Mesa[]) => void) => {
-  return onSnapshot(mesasRef, (snapshot) => {
+  const q = query(mesasRef, orderBy('id'));
+  return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Mesa)));
   });
 };
 
 export const subscribeToCategorias = (callback: (categorias: Categoria[]) => void) => {
-  return onSnapshot(categoriasRef, (snapshot) => {
+  const q = query(categoriasRef, orderBy('id'));
+  return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Categoria)));
   });
 };
 
 export const subscribeToProductos = (callback: (productos: Producto[]) => void) => {
-  return onSnapshot(productosRef, (snapshot) => {
+  const q = query(productosRef, orderBy('id'));
+  return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Producto)));
   });
 };
 
 export const subscribeToSabores = (callback: (sabores: Sabor[]) => void) => {
-  return onSnapshot(saboresRef, (snapshot) => {
+  const q = query(saboresRef, orderBy('id'));
+  return onSnapshot(q, (snapshot) => {
     callback(snapshot.docs.map(doc => ({ id: Number(doc.id), ...doc.data() } as Sabor)));
   });
 };
@@ -371,6 +375,129 @@ export const cancelOrderItem = async (pedidoId: number, itemId: number) => {
       await updateDoc(pedidoRef, { items: newItems });
     }
   }
+};
+
+export const syncProducts = async () => {
+  const batch = writeBatch(db);
+  
+  const snap = await getDocs(productosRef);
+  snap.docs.forEach(doc => {
+    batch.delete(doc.ref);
+  });
+
+  const nuevosProductos = [
+    { id: 1, nombre: 'cono 1 sabor', precio: 3500, categoria_id: 1 },
+    { id: 2, nombre: 'cono 2 sabores', precio: 6000, categoria_id: 1 },
+    { id: 3, nombre: 'cono 3 sabores', precio: 9000, categoria_id: 1 },
+    { id: 4, nombre: 'canasta 1 sabor', precio: 6000, categoria_id: 1 },
+    { id: 5, nombre: 'canasta 2 sabores', precio: 8500, categoria_id: 1 },
+    { id: 6, nombre: 'canasta 3 sabores', precio: 11000, categoria_id: 1 },
+    { id: 7, nombre: 'oblea', precio: 5000, categoria_id: 1 },
+    { id: 8, nombre: 'ensalada MAXI', precio: 17000, categoria_id: 1 },
+    { id: 9, nombre: 'ensalada mini', precio: 13000, categoria_id: 1 },
+    { id: 10, nombre: 'banana split', precio: 13000, categoria_id: 1 },
+    { id: 11, nombre: 'creeps con helado', precio: 16000, categoria_id: 1 },
+    { id: 12, nombre: 'frutihelado', precio: 16000, categoria_id: 1 },
+    { id: 13, nombre: 'copa oreo', precio: 13000, categoria_id: 1 },
+    { id: 14, nombre: 'pasion de chocolate', precio: 13000, categoria_id: 1 },
+    { id: 15, nombre: 'fresas con crema', precio: 13000, categoria_id: 1 },
+    { id: 16, nombre: 'copa sofi', precio: 13000, categoria_id: 1 },
+    { id: 17, nombre: 'copa victoria', precio: 13000, categoria_id: 1 },
+    { id: 18, nombre: 'brownie con helado', precio: 13000, categoria_id: 1 },
+    { id: 19, nombre: 'picada de frutas', precio: 11000, categoria_id: 1 },
+    { id: 20, nombre: 'copa sin helado', precio: 11000, categoria_id: 1 },
+    { id: 21, nombre: 'max sin helado', precio: 15000, categoria_id: 1 },
+    { id: 22, nombre: 'adicional de queso', precio: 3000, categoria_id: 1 },
+    { id: 23, nombre: 'hamburguesa', precio: 17000, categoria_id: 2 },
+    { id: 24, nombre: 'hamburguesa papas', precio: 20000, categoria_id: 2 },
+    { id: 25, nombre: 'Hamburguesa MAX', precio: 25000, categoria_id: 2 },
+    { id: 26, nombre: 'Hamburguesa Max papas', precio: 27000, categoria_id: 2 },
+    { id: 27, nombre: 'Cubano', precio: 17000, categoria_id: 2 },
+    { id: 28, nombre: 'Cubano con papa', precio: 20000, categoria_id: 2 },
+    { id: 29, nombre: 'creps pollo', precio: 17000, categoria_id: 2 },
+    { id: 30, nombre: 'creps pollo con papas', precio: 20000, categoria_id: 2 },
+    { id: 31, nombre: 'hamburguesa mini', precio: 9000, categoria_id: 2 },
+    { id: 32, nombre: 'Hamburguesa mini papas', precio: 12000, categoria_id: 2 },
+    { id: 33, nombre: 'salchipapa', precio: 12000, categoria_id: 2 },
+    { id: 34, nombre: 'sandwich pollo', precio: 7000, categoria_id: 2 },
+    { id: 35, nombre: 'sandwich', precio: 5000, categoria_id: 2 },
+    { id: 36, nombre: 'porcion papas', precio: 6000, categoria_id: 2 },
+    { id: 37, nombre: 'adicional carne', precio: 5000, categoria_id: 2 },
+    { id: 38, nombre: 'milo caliente', precio: 3500, categoria_id: 4 },
+    { id: 39, nombre: 'cafe', precio: 1500, categoria_id: 4 },
+    { id: 40, nombre: 'aromatica', precio: 1500, categoria_id: 4 },
+    { id: 41, nombre: 'pintadito', precio: 2000, categoria_id: 4 },
+    { id: 42, nombre: 'armatica con frutas', precio: 7000, categoria_id: 4 },
+    { id: 43, nombre: 'malteada', precio: 9000, categoria_id: 3 },
+    { id: 44, nombre: 'granizado de cafe', precio: 7000, categoria_id: 3 },
+    { id: 45, nombre: 'milo frio', precio: 7000, categoria_id: 3 },
+    { id: 46, nombre: 'tamarindo escarcha', precio: 7000, categoria_id: 3 },
+    { id: 47, nombre: 'soda escarcha', precio: 7000, categoria_id: 3 },
+    { id: 48, nombre: 'jugo leche', precio: 6000, categoria_id: 3 },
+    { id: 49, nombre: 'jugo en agua', precio: 5000, categoria_id: 3 },
+    { id: 50, nombre: 'hit cajita', precio: 2500, categoria_id: 3 },
+    { id: 51, nombre: 'hit litro', precio: 7000, categoria_id: 3 },
+    { id: 52, nombre: 'agua pequeña', precio: 1500, categoria_id: 3 },
+    { id: 53, nombre: 'agua grande', precio: 2500, categoria_id: 3 },
+    { id: 54, nombre: 'bombom', precio: 3000, categoria_id: 5 },
+    { id: 55, nombre: 'huevo sorpresa', precio: 5000, categoria_id: 5 },
+    { id: 56, nombre: 'paleta de agua', precio: 2500, categoria_id: 1 },
+    { id: 57, nombre: 'paleta mango viche', precio: 3000, categoria_id: 1 },
+    { id: 58, nombre: 'chococono', precio: 4000, categoria_id: 1 },
+    { id: 59, nombre: 'raton', precio: 7000, categoria_id: 5 },
+    { id: 60, nombre: 'araña', precio: 7000, categoria_id: 5 },
+    { id: 61, nombre: 'conejo', precio: 7000, categoria_id: 5 },
+    { id: 62, nombre: 'gusano', precio: 7000, categoria_id: 5 },
+    { id: 63, nombre: 'cerdito', precio: 7000, categoria_id: 5 },
+    { id: 64, nombre: 'gato', precio: 7000, categoria_id: 5 },
+    { id: 65, nombre: 'elefante', precio: 7000, categoria_id: 5 },
+    { id: 66, nombre: 'moneda', precio: 500, categoria_id: 5 },
+    { id: 67, nombre: '15 minutos', precio: 3000, categoria_id: 6 },
+    { id: 68, nombre: '30 minutos', precio: 5000, categoria_id: 6 },
+    { id: 69, nombre: '60 minutos', precio: 7000, categoria_id: 6 },
+    { id: 70, nombre: 'ficha', precio: 10000, categoria_id: 6 }
+  ];
+
+  nuevosProductos.forEach(p => {
+    batch.set(doc(productosRef, p.id.toString()), { ...p, disponible: 1 });
+  });
+
+  await batch.commit();
+};
+
+export const syncSabores = async () => {
+  const batch = writeBatch(db);
+  
+  const snap = await getDocs(saboresRef);
+  snap.docs.forEach(doc => {
+    batch.delete(doc.ref);
+  });
+
+  const nuevosSabores = [
+    { id: 1, nombre: 'fresa', tipo: 'helado' },
+    { id: 2, nombre: '3 leches', tipo: 'helado' },
+    { id: 3, nombre: 'brwnie', tipo: 'helado' },
+    { id: 4, nombre: 'ron pasas', tipo: 'helado' },
+    { id: 5, nombre: 'veteado de mora', tipo: 'helado' },
+    { id: 6, nombre: 'capuchino', tipo: 'helado' },
+    { id: 7, nombre: 'vainilla chips', tipo: 'helado' },
+    { id: 8, nombre: 'jumbo', tipo: 'helado' },
+    { id: 9, nombre: 'chicle', tipo: 'helado' },
+    { id: 10, nombre: 'yogurt maracuya', tipo: 'helado' },
+    { id: 11, nombre: 'maracuya', tipo: 'helado' },
+    { id: 12, nombre: 'nata mani', tipo: 'helado' },
+    { id: 13, nombre: 'mora', tipo: 'jugo' },
+    { id: 14, nombre: 'maracuya', tipo: 'jugo' },
+    { id: 15, nombre: 'guanabana', tipo: 'jugo' },
+    { id: 16, nombre: 'manzanilla', tipo: 'aromatica' },
+    { id: 17, nombre: 'hierbabuena', tipo: 'aromatica' }
+  ];
+
+  nuevosSabores.forEach(s => {
+    batch.set(doc(saboresRef, s.id.toString()), { ...s, disponible: true });
+  });
+
+  await batch.commit();
 };
 
 export const getReportes = async (fecha: string) => {

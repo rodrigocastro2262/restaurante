@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Pedido, Producto, Categoria } from '../types';
 import { TimerDisplay } from './TimerDisplay';
-import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package, Edit3, Plus, Minus, Trash2, CheckCircle2, XCircle, MessageCircle } from 'lucide-react';
+import { CreditCard, DollarSign, Wallet, Building2, Receipt, X, Utensils, Pause, Play, TrendingUp, TrendingDown, Calendar, Package, Edit3, Plus, Minus, Trash2, CheckCircle2, XCircle, MessageCircle, Volume2, VolumeX } from 'lucide-react';
 import { 
   subscribeToPedidosActivos, 
   subscribeToProductos, 
@@ -16,7 +16,9 @@ import {
   cancelOrderItem,
   pauseTimer,
   resumeTimer,
-  getReportes
+  getReportes,
+  syncProducts,
+  syncSabores
 } from '../services/db';
 
 type AdminTab = 'caja' | 'gastos' | 'ventas' | 'productos';
@@ -75,6 +77,12 @@ export default function AdminView() {
   const [reporteVentas, setReporteVentas] = useState<ReporteVentas>({ ventas: 0, gastos: 0, ganancia: 0 });
   const [reporteProductos, setReporteProductos] = useState<ReporteProducto[]>([]);
 
+  // Sound state
+  const [audioEnabled, setAudioEnabled] = useState(true);
+  const [knownItemIds, setKnownItemIds] = useState<Set<number>>(new Set());
+  const [announcedTimers, setAnnouncedTimers] = useState<Set<number>>(new Set());
+  const isInitialLoad = React.useRef(true);
+
   useEffect(() => {
     const unsubPedidos = subscribeToPedidosActivos(setPedidos);
     const unsubProd = subscribeToProductos(setProductos);
@@ -88,6 +96,80 @@ export default function AdminView() {
       unsubCat();
     };
   }, []);
+
+  // Check for new orders
+  useEffect(() => {
+    if (pedidos.length === 0) return;
+    
+    if (isInitialLoad.current) {
+      const initialIds = new Set<number>();
+      pedidos.forEach(p => p.items.forEach(i => initialIds.add(i.id)));
+      setKnownItemIds(initialIds);
+      isInitialLoad.current = false;
+      return;
+    }
+
+    let hasNew = false;
+    const currentIds = new Set(knownItemIds);
+    
+    pedidos.forEach(p => {
+      p.items.forEach(i => {
+        if (!knownItemIds.has(i.id)) {
+          hasNew = true;
+          currentIds.add(i.id);
+        }
+      });
+    });
+
+    if (hasNew) {
+      setKnownItemIds(currentIds);
+      if (audioEnabled) {
+        const audio = new Audio('https://actions.google.com/sounds/v1/doors/front_door_chime.ogg');
+        audio.play().catch(e => console.log('Audio play failed:', e));
+        
+        setTimeout(() => {
+          const msg = new SpeechSynthesisUtterance("Nuevo pedido en cocina");
+          msg.lang = 'es-ES';
+          window.speechSynthesis.speak(msg);
+        }, 1500);
+      }
+    }
+  }, [pedidos, audioEnabled, knownItemIds]);
+
+  // Check for expired timers
+  useEffect(() => {
+    if (!audioEnabled) return;
+
+    const interval = setInterval(() => {
+      pedidos.forEach(pedido => {
+        if (pedido.juego_minutos && pedido.juego_minutos > 0) {
+          let diff = 0;
+          if (pedido.juego_estado === 'pausado') {
+            diff = pedido.juego_restante_ms || 0;
+          } else if (pedido.juego_inicio) {
+            const start = new Date(pedido.juego_inicio).getTime();
+            const end = start + pedido.juego_minutos * 60000;
+            const now = Date.now();
+            diff = end - now;
+          }
+
+          if (diff <= 0 && !announcedTimers.has(pedido.id)) {
+            setAnnouncedTimers(prev => new Set(prev).add(pedido.id));
+            
+            const audio = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+            audio.play().catch(e => console.log('Audio play failed:', e));
+
+            setTimeout(() => {
+              const msg = new SpeechSynthesisUtterance(`Mesa ${pedido.mesa_numero} terminó el tiempo`);
+              msg.lang = 'es-ES';
+              window.speechSynthesis.speak(msg);
+            }, 1000);
+          }
+        }
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [pedidos, announcedTimers, audioEnabled]);
 
   useEffect(() => {
     if (activeTab === 'gastos') {
@@ -411,11 +493,6 @@ export default function AdminView() {
                             )}
                           </div>
                         </div>
-                        {item.sabores && item.sabores.length > 0 && (
-                          <div className="text-xs text-pink-600 font-medium ml-6">
-                            Sabores: {item.sabores.join(', ')}
-                          </div>
-                        )}
                         {item.notas && (
                           <div className="text-xs text-gray-600 italic ml-6">
                             Nota: {item.notas}
@@ -623,17 +700,28 @@ export default function AdminView() {
           </button>
         </div>
         
-        {(activeTab === 'gastos' || activeTab === 'ventas') && (
-          <div className="flex items-center gap-2">
-            <Calendar className="w-5 h-5 text-gray-500" />
-            <input
-              type="date"
-              value={reporteFecha}
-              onChange={(e) => setReporteFecha(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-            />
-          </div>
-        )}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setAudioEnabled(!audioEnabled)}
+            className={`p-2 rounded-lg transition-colors ${
+              audioEnabled ? 'bg-indigo-100 text-indigo-600' : 'bg-gray-100 text-gray-400'
+            }`}
+            title={audioEnabled ? "Desactivar sonido" : "Activar sonido"}
+          >
+            {audioEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+          </button>
+          {(activeTab === 'gastos' || activeTab === 'ventas') && (
+            <div className="flex items-center gap-2">
+              <Calendar className="w-5 h-5 text-gray-500" />
+              <input
+                type="date"
+                value={reporteFecha}
+                onChange={(e) => setReporteFecha(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-6">
@@ -971,6 +1059,30 @@ export default function AdminView() {
                     <Package className="w-5 h-5 text-indigo-500" />
                     Lista de Productos
                   </h2>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('¿Estás seguro de sincronizar los sabores? Esto reemplazará la lista actual.')) {
+                          await syncSabores();
+                          alert('Sabores sincronizados correctamente');
+                        }
+                      }}
+                      className="px-4 py-2 bg-pink-100 text-pink-700 hover:bg-pink-200 rounded-lg font-bold text-sm transition-colors"
+                    >
+                      Sincronizar Sabores
+                    </button>
+                    <button
+                      onClick={async () => {
+                        if (window.confirm('¿Estás seguro de sincronizar los productos? Esto reemplazará la lista actual.')) {
+                          await syncProducts();
+                          alert('Productos sincronizados correctamente');
+                        }
+                      }}
+                      className="px-4 py-2 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-lg font-bold text-sm transition-colors"
+                    >
+                      Sincronizar Menú
+                    </button>
+                  </div>
                 </div>
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">

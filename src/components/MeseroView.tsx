@@ -455,6 +455,36 @@ export default function MeseroView() {
                         </div>
                       )}
 
+                      {item.producto.nombre.toLowerCase().includes('jugo') && (
+                        <div className="flex gap-1 mt-1">
+                          <select
+                            value={item.sabores?.[0] || ''}
+                            onChange={(e) => updateSabor(item.id, 0, e.target.value)}
+                            className="w-full text-[10px] p-1 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="">Seleccionar Sabor de Jugo</option>
+                            {sabores.filter(s => s.tipo === 'jugo' && s.disponible).map(s => (
+                              <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
+                      {item.producto.nombre.toLowerCase().includes('aromatica') && (
+                        <div className="flex gap-1 mt-1">
+                          <select
+                            value={item.sabores?.[0] || ''}
+                            onChange={(e) => updateSabor(item.id, 0, e.target.value)}
+                            className="w-full text-[10px] p-1 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                          >
+                            <option value="">Seleccionar Sabor de Aromática</option>
+                            {sabores.filter(s => s.tipo === 'aromatica' && s.disponible).map(s => (
+                              <option key={s.id} value={s.nombre}>{s.nombre}</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+
                       <input
                         type="text"
                         placeholder="Especificaciones (ej. sin salsa...)"
