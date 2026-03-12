@@ -70,12 +70,12 @@ export default function App() {
   };
 
   if (!isAuthReady) {
-    return <div className="h-screen w-screen flex items-center justify-center bg-gray-100">Cargando...</div>;
+    return <div className="h-[100dvh] w-screen flex items-center justify-center bg-gray-100">Cargando...</div>;
   }
 
   if (!user) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gray-100 font-sans relative">
+      <div className="h-[100dvh] w-screen flex items-center justify-center bg-gray-100 font-sans relative">
         <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full border border-gray-100">
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
@@ -110,7 +110,7 @@ export default function App() {
 
   if (!role) {
     return (
-      <div className="h-screen w-screen flex items-center justify-center bg-gray-100 font-sans relative">
+      <div className="h-[100dvh] w-screen flex items-center justify-center bg-gray-100 font-sans relative">
         <div className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full border border-gray-100">
           <div className="flex justify-center mb-6">
             <div className="w-16 h-16 bg-indigo-600 rounded-2xl flex items-center justify-center shadow-lg transform -rotate-6">
@@ -195,7 +195,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-100 font-sans overflow-hidden">
+    <div className="h-[100dvh] w-screen flex flex-col bg-gray-100 font-sans overflow-hidden">
       {/* Top Navigation Bar */}
       <header className="bg-gray-900 text-white shadow-md z-10">
         <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
