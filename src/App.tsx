@@ -198,46 +198,49 @@ export default function App() {
     <div className="h-[100dvh] w-screen flex flex-col bg-gray-100 font-sans overflow-hidden">
       {/* Top Navigation Bar */}
       <header className="bg-gray-900 text-white shadow-md z-10">
-        <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-2 sm:px-4 h-16 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 bg-indigo-500 rounded-lg flex items-center justify-center">
               <Utensils className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold tracking-tight">Restaurante POS</span>
-            <span className="ml-2 px-2 py-0.5 bg-gray-800 text-xs font-medium rounded-full text-gray-300 uppercase tracking-wider">
+            <span className="text-lg sm:text-xl font-bold tracking-tight hidden sm:block">Restaurante POS</span>
+            <span className="px-2 py-0.5 bg-gray-800 text-xs font-medium rounded-full text-gray-300 uppercase tracking-wider">
               {role}
             </span>
           </div>
           
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <nav className="flex gap-1 bg-gray-800 p-1 rounded-xl">
               <button
                 onClick={() => setCurrentView('mesero')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   currentView === 'mesero' ? 'bg-indigo-500 text-white shadow-sm' : 'text-gray-300 hover:text-white hover:bg-gray-700'
                 }`}
+                title="Mesero"
               >
                 <Utensils className="w-4 h-4" />
-                Mesero
+                <span className="hidden sm:inline">Mesero</span>
               </button>
               <button
                 onClick={() => setCurrentView('cocina')}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                   currentView === 'cocina' ? 'bg-indigo-500 text-white shadow-sm' : 'text-gray-300 hover:text-white hover:bg-gray-700'
                 }`}
+                title="Cocina"
               >
                 <ChefHat className="w-4 h-4" />
-                Cocina (KDS)
+                <span className="hidden sm:inline">Cocina</span>
               </button>
               {role === 'admin' && (
                 <button
                   onClick={() => setCurrentView('admin')}
-                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  className={`flex items-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     currentView === 'admin' ? 'bg-indigo-500 text-white shadow-sm' : 'text-gray-300 hover:text-white hover:bg-gray-700'
                   }`}
+                  title="Admin"
                 >
                   <Receipt className="w-4 h-4" />
-                  Caja / Admin
+                  <span className="hidden sm:inline">Admin</span>
                 </button>
               )}
             </nav>
@@ -245,7 +248,7 @@ export default function App() {
             <button
               onClick={() => { setRole(null); setCurrentView('mesero'); }}
               className="p-2 text-gray-400 hover:text-white hover:bg-gray-800 rounded-lg transition-colors"
-              title="Cambiar Rol"
+              title="Salir"
             >
               <LogOut className="w-5 h-5" />
             </button>
