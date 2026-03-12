@@ -16,6 +16,27 @@ import {
   toggleSabor
 } from '../services/db';
 
+export const getEmojiForProduct = (nombre: string) => {
+  const n = nombre.toLowerCase();
+  if (n.includes('vainilla')) return '🍦';
+  if (n.includes('chocolate')) return '🍫';
+  if (n.includes('fresa')) return '🍓';
+  if (n.includes('mango')) return '🥭';
+  if (n.includes('maracuyá') || n.includes('maracuya')) return '🍈';
+  if (n.includes('limón') || n.includes('limon')) return '🍋';
+  if (n.includes('helado')) return '🍨';
+  if (n.includes('copa')) return '🍧';
+  if (n.includes('bebida') || n.includes('jugo') || n.includes('agua')) return '🥤';
+  if (n.includes('hamburguesa')) return '🍔';
+  if (n.includes('perro') || n.includes('hot dog')) return '🌭';
+  if (n.includes('pizza')) return '🍕';
+  if (n.includes('papas') || n.includes('fritas')) return '🍟';
+  if (n.includes('cerveza')) return '🍺';
+  if (n.includes('café') || n.includes('cafe')) return '☕';
+  if (n.includes('postre') || n.includes('torta') || n.includes('pastel')) return '🍰';
+  return '🍽️';
+};
+
 export default function MeseroView() {
   const [mesas, setMesas] = useState<Mesa[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -226,10 +247,10 @@ export default function MeseroView() {
 
     return (
       <>
-        <div className="flex flex-col lg:flex-row h-full bg-gray-50">
+        <div className="flex flex-col lg:flex-row h-full bg-[#FCF9F6]">
           {/* Left Panel - Menu */}
           <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="bg-white p-4 shadow-sm flex items-center gap-4">
+            <div className="bg-[#FCF9F6] p-4 flex items-center gap-4">
               <button onClick={handleBack} className="p-2 hover:bg-gray-100 rounded-full">
                 <ArrowLeft className="w-6 h-6" />
               </button>
@@ -328,34 +349,36 @@ export default function MeseroView() {
             </div>
 
             {!searchQuery && (
-              <div className="grid grid-cols-3 gap-4 mb-8">
+              <div className="flex overflow-x-auto gap-3 pb-4 mb-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {categorias.map(cat => (
                   <button
                     key={cat.id}
                     onClick={() => setSelectedCategoria(cat.id)}
-                    className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-colors ${selectedCategoria === cat.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-white text-gray-700 hover:bg-indigo-50 border border-gray-200'}`}
+                    className={`whitespace-nowrap px-6 py-2.5 rounded-full font-medium transition-colors ${selectedCategoria === cat.id ? 'bg-[#D94A38] text-white shadow-md' : 'bg-[#F5EBE6] text-gray-700 hover:bg-[#E8DCD5]'}`}
                   >
-                    {getIconForCategory(cat.nombre)}
-                    <span className="font-medium text-sm text-center">{cat.nombre}</span>
+                    {cat.nombre}
                   </button>
                 ))}
               </div>
             )}
 
             {(selectedCategoria || searchQuery) && (
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="flex flex-col gap-3">
                 {filteredProductos.map(prod => (
                   <button
                     key={prod.id}
                     onClick={() => addToCart(prod)}
-                    className="p-4 bg-white border border-gray-200 rounded-xl text-left hover:border-indigo-300 hover:shadow-sm transition-all"
+                    className="p-4 bg-white rounded-2xl text-left hover:shadow-md transition-all flex items-center gap-4"
                   >
-                    <div className="font-medium text-gray-900 mb-1">{prod.nombre}</div>
-                    <div className="text-indigo-600 font-semibold">${prod.precio.toLocaleString()}</div>
+                    <div className="text-3xl">{getEmojiForProduct(prod.nombre)}</div>
+                    <div>
+                      <div className="font-bold text-gray-900">{prod.nombre}</div>
+                      <div className="text-[#D94A38] font-bold">${prod.precio.toLocaleString()}</div>
+                    </div>
                   </button>
                 ))}
                 {filteredProductos.length === 0 && (
-                  <div className="col-span-full text-center py-8 text-gray-500">
+                  <div className="text-center py-8 text-gray-500">
                     No se encontraron productos.
                   </div>
                 )}
@@ -366,7 +389,7 @@ export default function MeseroView() {
 
         {/* Right Panel - Cart & Current Order */}
         <div className="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-1 lg:flex-none overflow-hidden">
-          <div className="p-4 border-b border-gray-200 bg-gray-50">
+          <div className="p-4 border-b border-gray-200 bg-[#FCF9F6]">
             <h3 className="text-lg font-bold">Pedido Actual</h3>
           </div>
           
@@ -431,7 +454,7 @@ export default function MeseroView() {
                 <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Nuevo Pedido</h4>
                 <div className="space-y-4">
                   {cart.map(item => (
-                    <div key={item.id} className="flex flex-col gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div key={item.id} className="flex flex-col gap-2 bg-[#FCF9F6] p-3 rounded-xl border border-gray-100">
                       <div className="flex justify-between">
                         <span className="font-medium text-gray-900">{item.producto.nombre}</span>
                         <span className="font-semibold text-gray-900">${(item.producto.precio * item.cantidad).toLocaleString()}</span>
@@ -495,9 +518,9 @@ export default function MeseroView() {
 
                       <div className="flex items-center justify-between mt-1">
                         <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-1">
-                          <button onClick={() => updateQuantity(item.id, -1)} className="p-1 bg-gray-50 rounded hover:bg-gray-100"><Minus className="w-3 h-3" /></button>
+                          <button onClick={() => updateQuantity(item.id, -1)} className="p-1 bg-[#F5EBE6] rounded hover:bg-[#E8DCD5]"><Minus className="w-3 h-3" /></button>
                           <span className="font-medium w-4 text-center text-sm">{item.cantidad}</span>
-                          <button onClick={() => updateQuantity(item.id, 1)} className="p-1 bg-gray-50 rounded hover:bg-gray-100"><Plus className="w-3 h-3" /></button>
+                          <button onClick={() => updateQuantity(item.id, 1)} className="p-1 bg-[#F5EBE6] rounded hover:bg-[#E8DCD5]"><Plus className="w-3 h-3" /></button>
                         </div>
                         <button onClick={() => removeFromCart(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
                           <Trash2 className="w-4 h-4" />
@@ -518,7 +541,7 @@ export default function MeseroView() {
           </div>
 
           {cart.length > 0 && (
-            <div className="p-4 border-t border-gray-200 bg-gray-50">
+            <div className="p-4 border-t border-gray-200 bg-[#FCF9F6]">
               <div className="flex justify-between items-center mb-4">
                 <span className="text-gray-600 font-medium">Total Nuevo</span>
                 <span className="text-2xl font-bold text-gray-900">${totalCart.toLocaleString()}</span>
@@ -579,7 +602,7 @@ export default function MeseroView() {
                         className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors shadow-sm ${
                           paymentMethod === method.id 
                             ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold ring-2 ring-indigo-200' 
-                            : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                            : 'bg-white border-gray-200 text-gray-600 hover:bg-[#FCF9F6]'
                         }`}
                       >
                         <Icon className="w-6 h-6" />
@@ -626,7 +649,7 @@ export default function MeseroView() {
   }
 
   return (
-    <div className="p-6 h-full overflow-y-auto bg-gray-50">
+    <div className="p-6 h-full overflow-y-auto bg-[#FCF9F6]">
       <h1 className="text-3xl font-bold text-gray-900 mb-8">Mapa de Mesas</h1>
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
         {mesas.map(mesa => (

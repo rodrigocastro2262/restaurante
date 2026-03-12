@@ -73,7 +73,12 @@ export default function AdminView() {
   const [newGasto, setNewGasto] = useState({ descripcion: '', categoria: 'insumos', monto: '' });
   
   // Reportes state
-  const [reporteFecha, setReporteFecha] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalDateString = () => {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+    return d.toISOString().split('T')[0];
+  };
+  const [reporteFecha, setReporteFecha] = useState(getLocalDateString());
   const [reporteVentas, setReporteVentas] = useState<ReporteVentas>({ ventas: 0, gastos: 0, ganancia: 0 });
   const [reporteProductos, setReporteProductos] = useState<ReporteProducto[]>([]);
 
@@ -394,7 +399,7 @@ export default function AdminView() {
 
   if (selectedPedido) {
     return (
-      <div className="p-6 h-full flex flex-col bg-gray-50 max-w-4xl mx-auto">
+      <div className="p-6 h-full flex flex-col bg-[#FCF9F6] max-w-4xl mx-auto">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 flex flex-col overflow-hidden h-full relative">
           <div className="p-4 border-b border-gray-200 bg-gray-900 flex justify-between items-center relative z-10">
             <h2 className="text-xl font-bold text-white">Cobrar Mesa {selectedPedido.mesa_numero}</h2>
@@ -557,7 +562,7 @@ export default function AdminView() {
                           className={`p-3 rounded-xl border flex flex-col items-center justify-center gap-2 transition-colors shadow-sm ${
                             paymentMethod === method.id 
                               ? 'bg-indigo-50 border-indigo-500 text-indigo-700 font-bold ring-2 ring-indigo-200' 
-                              : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
+                              : 'bg-white border-gray-200 text-gray-600 hover:bg-[#FCF9F6]'
                           }`}
                         >
                           <Icon className="w-6 h-6" />
@@ -577,7 +582,7 @@ export default function AdminView() {
                       value={montoAPagar}
                       onChange={(e) => setMontoAPagar(e.target.value)}
                       readOnly={splitMode}
-                      className={`block w-full pl-12 pr-4 py-4 text-2xl font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 ${splitMode ? 'bg-gray-50 cursor-not-allowed' : ''}`}
+                      className={`block w-full pl-12 pr-4 py-4 text-2xl font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-xl focus:ring-indigo-500 focus:border-indigo-500 ${splitMode ? 'bg-[#FCF9F6] cursor-not-allowed' : ''}`}
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -588,7 +593,7 @@ export default function AdminView() {
                     <div className="mt-3 flex gap-2">
                       <button 
                         onClick={() => setMontoAPagar(((calculateTotal(selectedPedido) - (selectedPedido.pagado || 0)) / 2).toString())}
-                        className="flex-1 py-2 bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 rounded-lg font-bold text-sm transition-colors shadow-sm"
+                        className="flex-1 py-2 bg-white hover:bg-[#FCF9F6] text-gray-700 border border-gray-200 rounded-lg font-bold text-sm transition-colors shadow-sm"
                       >
                         Mitad (50%)
                       </button>
@@ -628,7 +633,7 @@ export default function AdminView() {
             </div>
           </div>
 
-          <div className="p-6 border-t border-gray-200 bg-gray-50 relative z-10">
+          <div className="p-6 border-t border-gray-200 bg-[#FCF9F6] relative z-10">
             <button
               onClick={handlePayment}
               disabled={!montoAPagar || parseFloat(montoAPagar) <= 0}
@@ -674,7 +679,7 @@ export default function AdminView() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
+    <div className="flex flex-col h-full bg-[#FCF9F6]">
       {/* Admin Navigation */}
       <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
         <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
@@ -1070,7 +1075,7 @@ export default function AdminView() {
 
             <div className="lg:col-span-2">
               <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
-                <div className="p-6 border-b border-gray-200 bg-gray-50 flex justify-between items-center">
+                <div className="p-6 border-b border-gray-200 bg-[#FCF9F6] flex justify-between items-center">
                   <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
                     <Package className="w-5 h-5 text-indigo-500" />
                     Lista de Productos
@@ -1103,7 +1108,7 @@ export default function AdminView() {
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="bg-gray-50 border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500">
+                      <tr className="bg-[#FCF9F6] border-b border-gray-200 text-xs uppercase tracking-wider text-gray-500">
                         <th className="p-4 font-bold">Producto</th>
                         <th className="p-4 font-bold">Categoría</th>
                         <th className="p-4 font-bold text-right">Precio</th>
@@ -1115,7 +1120,7 @@ export default function AdminView() {
                       {productos.map(prod => {
                         const cat = categorias.find(c => c.id === prod.categoria_id);
                         return (
-                          <tr key={prod.id} className={`hover:bg-gray-50 transition-colors ${prod.disponible === 0 ? 'opacity-60 bg-gray-50' : ''}`}>
+                          <tr key={prod.id} className={`hover:bg-[#FCF9F6] transition-colors ${prod.disponible === 0 ? 'opacity-60 bg-[#FCF9F6]' : ''}`}>
                             <td className="p-4 font-medium text-gray-900">{prod.nombre}</td>
                             <td className="p-4 text-sm text-gray-500">{cat?.nombre || 'Desconocida'}</td>
                             <td className="p-4 text-right font-bold text-indigo-600">${prod.precio.toLocaleString()}</td>

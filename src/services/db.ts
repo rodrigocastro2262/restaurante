@@ -522,10 +522,9 @@ export const syncSabores = async () => {
 };
 
 export const getReportes = async (fecha: string) => {
-  const start = new Date(fecha);
-  start.setHours(0, 0, 0, 0);
-  const end = new Date(fecha);
-  end.setHours(23, 59, 59, 999);
+  const [year, month, day] = fecha.split('-').map(Number);
+  const start = new Date(year, month - 1, day, 0, 0, 0, 0);
+  const end = new Date(year, month - 1, day, 23, 59, 59, 999);
 
   const startStr = start.toISOString();
   const endStr = end.toISOString();

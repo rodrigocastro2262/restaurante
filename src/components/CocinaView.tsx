@@ -221,7 +221,7 @@ export default function CocinaView() {
                 <h2 className="text-2xl font-black">Mesa {pedido.mesa_numero}</h2>
                 <WaitTimer creadoEn={pedido.creado_en} />
               </div>
-              <div className="p-4 flex-1 flex flex-col gap-3 bg-gray-50">
+              <div className="p-4 flex-1 flex flex-col gap-3 bg-[#FCF9F6]">
                 {pedido.items.filter(i => i.estado !== 'entregado').map(item => (
                   <div key={item.id} className="bg-white p-3 rounded-xl border border-gray-200 flex flex-col gap-2 shadow-sm">
                     <div className="flex items-start gap-2">
