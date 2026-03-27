@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Mesa, Categoria, Producto, Pedido, Sabor } from '../types';
 import { TimerDisplay } from './TimerDisplay';
-import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search, MessageCircle } from 'lucide-react';
+import { Utensils, Coffee, IceCream, Gamepad2, Baby, Sandwich, Check, Clock, ChefHat, CreditCard, ArrowLeft, Plus, Minus, Trash2, Pause, Play, DollarSign, Wallet, Building2, X, Search, MessageCircle, ChevronDown, ChevronUp } from 'lucide-react';
 import { 
   subscribeToMesas, 
   subscribeToCategorias, 
@@ -50,6 +50,7 @@ export default function MeseroView() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<string>('Efectivo');
   const [clientPhone, setClientPhone] = useState<string>('');
+  const [showSabores, setShowSabores] = useState(false);
 
   const paymentMethods = [
     { id: 'Efectivo', icon: DollarSign },
@@ -276,76 +277,95 @@ export default function MeseroView() {
             </div>
           
           <div className="flex-1 overflow-y-auto p-4">
-            {/* Quick References */}
-            <div className="mb-6 space-y-4">
-              {/* Sabores de Helado */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <IceCream className="w-4 h-4 text-pink-500" />
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Helados (Click para agotar)</h3>
+            {/* Quick References (Collapsible) */}
+            <div className="mb-6">
+              <button
+                onClick={() => setShowSabores(!showSabores)}
+                className="w-full flex items-center justify-between bg-white px-4 py-3 rounded-xl border border-gray-200 shadow-sm hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <IceCream className="w-5 h-5 text-[#D94A38]" />
+                  <span className="font-bold text-gray-700">Disponibilidad de Sabores</span>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  {sabores.filter(s => s.tipo === 'helado').map(sabor => (
-                    <button
-                      key={sabor.id}
-                      onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
-                      className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                        sabor.disponible 
-                          ? 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100' 
-                          : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
-                      }`}
-                    >
-                      {sabor.nombre}
-                    </button>
-                  ))}
-                </div>
-              </div>
+                {showSabores ? (
+                  <ChevronUp className="w-5 h-5 text-gray-400" />
+                ) : (
+                  <ChevronDown className="w-5 h-5 text-gray-400" />
+                )}
+              </button>
 
-              {/* Jugos */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Coffee className="w-4 h-4 text-orange-500" />
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Jugos</h3>
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  {sabores.filter(s => s.tipo === 'jugo').map(sabor => (
-                    <button
-                      key={sabor.id}
-                      onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
-                      className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                        sabor.disponible 
-                          ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' 
-                          : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
-                      }`}
-                    >
-                      {sabor.nombre}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              {showSabores && (
+                <div className="mt-2 p-4 bg-white border border-gray-200 rounded-xl shadow-sm space-y-4">
+                  {/* Sabores de Helado */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <IceCream className="w-4 h-4 text-pink-500" />
+                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Helados (Click para agotar)</h3>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {sabores.filter(s => s.tipo === 'helado').map(sabor => (
+                        <button
+                          key={sabor.id}
+                          onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
+                          className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                            sabor.disponible 
+                              ? 'bg-pink-50 text-pink-700 border-pink-200 hover:bg-pink-100' 
+                              : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
+                          }`}
+                        >
+                          {sabor.nombre}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-              {/* Aromáticas */}
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <Coffee className="w-4 h-4 text-green-500" />
-                  <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Aromáticas</h3>
+                  {/* Jugos */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Coffee className="w-4 h-4 text-orange-500" />
+                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Jugos</h3>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {sabores.filter(s => s.tipo === 'jugo').map(sabor => (
+                        <button
+                          key={sabor.id}
+                          onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
+                          className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                            sabor.disponible 
+                              ? 'bg-orange-50 text-orange-700 border-orange-200 hover:bg-orange-100' 
+                              : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
+                          }`}
+                        >
+                          {sabor.nombre}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Aromáticas */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-2">
+                      <Coffee className="w-4 h-4 text-green-500" />
+                      <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Aromáticas</h3>
+                    </div>
+                    <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                      {sabores.filter(s => s.tipo === 'aromatica').map(sabor => (
+                        <button
+                          key={sabor.id}
+                          onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
+                          className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
+                            sabor.disponible 
+                              ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
+                              : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
+                          }`}
+                        >
+                          {sabor.nombre}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                  {sabores.filter(s => s.tipo === 'aromatica').map(sabor => (
-                    <button
-                      key={sabor.id}
-                      onClick={() => handleToggleSabor(sabor.id, sabor.disponible)}
-                      className={`whitespace-nowrap px-3 py-1 rounded-full text-xs font-bold border transition-colors ${
-                        sabor.disponible 
-                          ? 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100' 
-                          : 'bg-gray-100 text-gray-400 border-gray-200 line-through hover:bg-gray-200'
-                      }`}
-                    >
-                      {sabor.nombre}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              )}
             </div>
 
             {!searchQuery && (
@@ -363,22 +383,20 @@ export default function MeseroView() {
             )}
 
             {(selectedCategoria || searchQuery) && (
-              <div className="flex flex-col gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                 {filteredProductos.map(prod => (
                   <button
                     key={prod.id}
                     onClick={() => addToCart(prod)}
-                    className="p-4 bg-white rounded-2xl text-left hover:shadow-md transition-all flex items-center gap-4"
+                    className="p-4 bg-white rounded-2xl text-center hover:shadow-md transition-all flex flex-col items-center justify-center gap-2 border border-gray-100"
                   >
-                    <div className="text-3xl">{getEmojiForProduct(prod.nombre)}</div>
-                    <div>
-                      <div className="font-bold text-gray-900">{prod.nombre}</div>
-                      <div className="text-[#D94A38] font-bold">${prod.precio.toLocaleString()}</div>
-                    </div>
+                    <div className="text-4xl mb-1">{getEmojiForProduct(prod.nombre)}</div>
+                    <div className="font-bold text-gray-900 leading-tight text-sm">{prod.nombre}</div>
+                    <div className="text-[#D94A38] font-bold text-sm">${prod.precio.toLocaleString()}</div>
                   </button>
                 ))}
                 {filteredProductos.length === 0 && (
-                  <div className="text-center py-8 text-gray-500">
+                  <div className="col-span-full text-center py-8 text-gray-500">
                     No se encontraron productos.
                   </div>
                 )}
@@ -388,7 +406,7 @@ export default function MeseroView() {
         </div>
 
         {/* Right Panel - Cart & Current Order */}
-        <div className="w-full lg:w-96 bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-1 lg:flex-none overflow-hidden">
+        <div className="w-full lg:w-[480px] bg-white border-t lg:border-t-0 lg:border-l border-gray-200 flex flex-col flex-1 lg:flex-none overflow-hidden">
           <div className="p-4 border-b border-gray-200 bg-[#FCF9F6]">
             <h3 className="text-lg font-bold">Pedido Actual</h3>
           </div>
@@ -422,23 +440,24 @@ export default function MeseroView() {
                 </div>
                 <div className="space-y-3">
                   {pedidoActual.items.map(item => (
-                    <div key={item.id} className="flex flex-col gap-1 text-sm border-b border-gray-50 pb-2">
+                    <div key={item.id} className="flex flex-col gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
                       <div className="flex justify-between items-center">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-gray-900">{item.cantidad}x</span>
-                          <span className="text-gray-700">{item.producto_nombre}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="font-bold text-gray-900 bg-white px-2 py-1 rounded-lg shadow-sm">{item.cantidad}x</span>
+                          <span className="text-xl">{getEmojiForProduct(item.producto_nombre)}</span>
+                          <span className="font-medium text-gray-800 text-base">{item.producto_nombre}</span>
                         </div>
-                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${
-                          item.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800' :
-                          item.estado === 'preparando' ? 'bg-blue-100 text-blue-800' :
-                          'bg-green-100 text-green-800'
+                        <span className={`text-xs px-3 py-1.5 rounded-full font-bold shadow-sm ${
+                          item.estado === 'pendiente' ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' :
+                          item.estado === 'preparando' ? 'bg-blue-100 text-blue-800 border border-blue-200' :
+                          'bg-green-100 text-green-800 border border-green-200'
                         }`}>
                           {item.estado}
                         </span>
                       </div>
                       {item.notas && (
-                        <div className="text-xs text-gray-500 italic ml-6">
-                          Nota: {item.notas}
+                        <div className="text-sm text-gray-500 italic ml-14 bg-white p-2 rounded-lg border border-gray-100">
+                          {item.notas}
                         </div>
                       )}
                     </div>
@@ -454,20 +473,23 @@ export default function MeseroView() {
                 <h4 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-3">Nuevo Pedido</h4>
                 <div className="space-y-4">
                   {cart.map(item => (
-                    <div key={item.id} className="flex flex-col gap-2 bg-[#FCF9F6] p-3 rounded-xl border border-gray-100">
-                      <div className="flex justify-between">
-                        <span className="font-medium text-gray-900">{item.producto.nombre}</span>
-                        <span className="font-semibold text-gray-900">${(item.producto.precio * item.cantidad).toLocaleString()}</span>
+                    <div key={item.id} className="flex flex-col gap-3 bg-white p-4 rounded-2xl border border-gray-200 shadow-sm">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">{getEmojiForProduct(item.producto.nombre)}</span>
+                          <span className="font-bold text-gray-900 text-lg">{item.producto.nombre}</span>
+                        </div>
+                        <span className="font-black text-[#D94A38] text-lg">${(item.producto.precio * item.cantidad).toLocaleString()}</span>
                       </div>
                       
                       {item.producto.categoria_id === 1 && (
-                        <div className="flex gap-1 mt-1">
+                        <div className="flex gap-2 mt-1">
                           {[0, 1, 2].map(idx => (
                             <select
                               key={idx}
                               value={item.sabores?.[idx] || ''}
                               onChange={(e) => updateSabor(item.id, idx, e.target.value)}
-                              className="w-1/3 text-[10px] p-1 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                              className="w-1/3 text-xs p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50"
                             >
                               <option value="">Sabor {idx + 1}</option>
                               {sabores.filter(s => s.tipo === 'helado' && s.disponible).map(s => (
@@ -479,11 +501,11 @@ export default function MeseroView() {
                       )}
 
                       {item.producto.nombre.toLowerCase().includes('jugo') && (
-                        <div className="flex gap-1 mt-1">
+                        <div className="flex gap-2 mt-1">
                           <select
                             value={item.sabores?.[0] || ''}
                             onChange={(e) => updateSabor(item.id, 0, e.target.value)}
-                            className="w-full text-[10px] p-1 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                            className="w-full text-xs p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50"
                           >
                             <option value="">Seleccionar Sabor de Jugo</option>
                             {sabores.filter(s => s.tipo === 'jugo' && s.disponible).map(s => (
@@ -494,11 +516,11 @@ export default function MeseroView() {
                       )}
 
                       {item.producto.nombre.toLowerCase().includes('aromatica') && (
-                        <div className="flex gap-1 mt-1">
+                        <div className="flex gap-2 mt-1">
                           <select
                             value={item.sabores?.[0] || ''}
                             onChange={(e) => updateSabor(item.id, 0, e.target.value)}
-                            className="w-full text-[10px] p-1 border border-gray-300 rounded focus:ring-1 focus:ring-indigo-500"
+                            className="w-full text-xs p-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 bg-gray-50"
                           >
                             <option value="">Seleccionar Sabor de Aromática</option>
                             {sabores.filter(s => s.tipo === 'aromatica' && s.disponible).map(s => (
@@ -513,17 +535,17 @@ export default function MeseroView() {
                         placeholder="Especificaciones (ej. sin salsa...)"
                         value={item.notas}
                         onChange={(e) => updateNotas(item.id, e.target.value)}
-                        className="w-full text-xs px-2 py-1.5 border border-gray-300 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                        className="w-full text-sm px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 bg-gray-50"
                       />
 
-                      <div className="flex items-center justify-between mt-1">
-                        <div className="flex items-center gap-3 bg-white border border-gray-200 rounded-lg p-1">
-                          <button onClick={() => updateQuantity(item.id, -1)} className="p-1 bg-[#F5EBE6] rounded hover:bg-[#E8DCD5]"><Minus className="w-3 h-3" /></button>
-                          <span className="font-medium w-4 text-center text-sm">{item.cantidad}</span>
-                          <button onClick={() => updateQuantity(item.id, 1)} className="p-1 bg-[#F5EBE6] rounded hover:bg-[#E8DCD5]"><Plus className="w-3 h-3" /></button>
+                      <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-100">
+                        <div className="flex items-center gap-4 bg-gray-50 border border-gray-200 rounded-xl p-1">
+                          <button onClick={() => updateQuantity(item.id, -1)} className="p-2 bg-white rounded-lg hover:bg-gray-100 shadow-sm"><Minus className="w-4 h-4 text-gray-600" /></button>
+                          <span className="font-bold w-6 text-center text-lg">{item.cantidad}</span>
+                          <button onClick={() => updateQuantity(item.id, 1)} className="p-2 bg-white rounded-lg hover:bg-gray-100 shadow-sm"><Plus className="w-4 h-4 text-gray-600" /></button>
                         </div>
-                        <button onClick={() => removeFromCart(item.id)} className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg">
-                          <Trash2 className="w-4 h-4" />
+                        <button onClick={() => removeFromCart(item.id)} className="p-2 text-red-500 hover:bg-red-50 rounded-xl transition-colors">
+                          <Trash2 className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
